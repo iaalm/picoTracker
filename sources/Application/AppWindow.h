@@ -49,6 +49,7 @@ public:
   void CloseProject();
 
   using GUIWindow::Clear;
+  using GUIWindow::SetColor;
   virtual void Clear(bool all = false);
   virtual void ClearTextRect(GUIRect &rect);
   virtual void SetColor(ColorDefinition cd);
