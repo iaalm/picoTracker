@@ -48,6 +48,7 @@ protected:
   virtual void updateStatus(uint32_t current, uint32_t total,
                             const char *message);
   virtual bool loadSample(const char *name) = 0;
+  virtual uint32_t loadHitCount() const { return 0; }
   bool loadSoundFont(const char *path);
   uint32_t count_;
   char nameStore_[MAX_SAMPLES][MAX_INSTRUMENT_FILENAME_LENGTH + 1];

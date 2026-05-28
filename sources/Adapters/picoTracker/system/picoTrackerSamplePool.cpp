@@ -85,6 +85,7 @@ void picoTrackerSamplePool::Reset() {
   // Reset flash erase and write pointers when we close project
   flashEraseOffset_ = FLASH_TARGET_OFFSET;
   flashWriteOffset_ = FLASH_TARGET_OFFSET;
+  reusedSamples_ = 0;
 };
 
 bool picoTrackerSamplePool::loadSample(const char *name) {
@@ -96,8 +97,12 @@ bool picoTrackerSamplePool::loadSample(const char *name) {
     multicore_lockout_start_blocking();
   }
 
-  if (count_ == MAX_SAMPLES)
+  if (count_ == MAX_SAMPLES) {
+    if (multicore_lockout_victim_is_initialized(1)) {
+      multicore_lockout_end_blocking();
+    }
     return false;
+  }
 
   auto res = wav_[count_].Open(name);
   if (!res) {
@@ -113,7 +118,8 @@ bool picoTrackerSamplePool::loadSample(const char *name) {
 
   updateStatus(importIndex, importCount, "Importing");
 
-  if (!LoadInFlash(&wav_[count_ - 1])) {
+  bool reusedFromFlash = false;
+  if (!LoadInFlash(&wav_[count_ - 1], reusedFromFlash)) {
     Trace::Error("Failed to load sample into flash: %s", name);
     count_--;
     nameStore_[count_][0] = '\0';
@@ -126,13 +132,18 @@ bool picoTrackerSamplePool::loadSample(const char *name) {
 
   wav_[count_ - 1].Close();
 
+  if (reusedFromFlash) {
+    reusedSamples_++;
+  }
+
   if (multicore_lockout_victim_is_initialized(1)) {
     multicore_lockout_end_blocking();
   }
   return true;
 };
 
-bool picoTrackerSamplePool::LoadInFlash(WavFile *wave) {
+bool picoTrackerSamplePool::LoadInFlash(WavFile *wave, bool &reusedFromFlash) {
+  reusedFromFlash = false;
 
   uint32_t FlashBaseBufferSize = wave->GetDiskSize(-1);
 
@@ -150,6 +161,44 @@ bool picoTrackerSamplePool::LoadInFlash(WavFile *wave) {
 
   // Set wave base
   wave->SetSampleBuffer((short *)(XIP_BASE + flashWriteOffset_));
+
+  // First compare against already-written flash pages; if equal we skip writes.
+  bool needsWrite = false;
+  uint32_t compareOffset = flashWriteOffset_;
+  uint32_t br = 0;
+  uint8_t readBuffer[BUFFER_SIZE];
+  wave->Rewind();
+  wave->Read(&readBuffer, BUFFER_SIZE, &br);
+  while (br > 0) {
+    uint32_t compareSize = AlignUp_(br, FLASH_PAGE_SIZE);
+    if (compareSize > br) {
+      memset(readBuffer + br, 0, compareSize - br);
+    }
+
+    const uint8_t *flashData = (const uint8_t *)(XIP_BASE + compareOffset);
+    if (memcmp(flashData, readBuffer, compareSize) != 0) {
+      needsWrite = true;
+      break;
+    }
+
+    compareOffset += compareSize;
+    wave->Read(&readBuffer, BUFFER_SIZE, &br);
+  }
+
+  if (!needsWrite) {
+    reusedFromFlash = true;
+    flashWriteOffset_ += FlashPageBufferSize;
+    uint32_t eraseFloor = AlignUp_(flashWriteOffset_, FLASH_SECTOR_SIZE);
+    if (flashEraseOffset_ < eraseFloor) {
+      flashEraseOffset_ = eraseFloor;
+    }
+    return true;
+  }
+
+  uint32_t eraseFloor = AlignUp_(flashWriteOffset_, FLASH_SECTOR_SIZE);
+  if (flashEraseOffset_ < eraseFloor) {
+    flashEraseOffset_ = eraseFloor;
+  }
 
   // Any operation on the flash need to ensure that nothing else reads or writes
   // on it We disable IRQs and ensure that we don't have multiprocessing on
@@ -174,10 +223,6 @@ bool picoTrackerSamplePool::LoadInFlash(WavFile *wave) {
     // Trace::Debug("new erase offset: %p", flashEraseOffset_);
   }
 
-  uint32_t offset = 0;
-  uint32_t br = 0;
-  uint8_t readBuffer[BUFFER_SIZE];
-
   wave->Rewind();
   wave->Read(&readBuffer, BUFFER_SIZE, &br);
   while (br > 0) {
@@ -188,6 +233,9 @@ bool picoTrackerSamplePool::LoadInFlash(WavFile *wave) {
     writeSize =
         ((writeSize / FLASH_PAGE_SIZE) + ((writeSize % FLASH_PAGE_SIZE) != 0)) *
         FLASH_PAGE_SIZE;
+    if (writeSize > br) {
+      memset(readBuffer + br, 0, writeSize - br);
+    }
 
     // There will be trash at the end, but sampleBufferSize_ gives me the
     // bounds
@@ -200,6 +248,11 @@ bool picoTrackerSamplePool::LoadInFlash(WavFile *wave) {
   restore_interrupts(irqs);
   return true;
 };
+
+uint32_t picoTrackerSamplePool::AlignUp_(uint32_t value,
+                                         uint32_t alignment) const {
+  return ((value + alignment - 1) / alignment) * alignment;
+}
 
 bool picoTrackerSamplePool::unloadSample(uint32_t index) { return false; };
 

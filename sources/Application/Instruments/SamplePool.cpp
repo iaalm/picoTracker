@@ -59,17 +59,42 @@ void SamplePool::Load(const char *projectName) {
   // First, find all wav files
   etl::vector<int, MAX_FILE_INDEX_SIZE> fileIndexes;
   fs->list(&fileIndexes, ".wav", false);
+  char leftName[PFILENAME_SIZE];
+  char rightName[PFILENAME_SIZE];
+
+  // Keep load order deterministic to preserve stable flash mapping.
+  for (size_t i = 0; i < fileIndexes.size(); ++i) {
+    for (size_t j = i + 1; j < fileIndexes.size(); ++j) {
+      fs->getFileName(fileIndexes[i], leftName, sizeof(leftName));
+      fs->getFileName(fileIndexes[j], rightName, sizeof(rightName));
+      if (strcmp(rightName, leftName) < 0) {
+        int tmp = fileIndexes[i];
+        fileIndexes[i] = fileIndexes[j];
+        fileIndexes[j] = tmp;
+      }
+    }
+  }
+
   char name[PFILENAME_SIZE];
-  uint totalSamples = fileIndexes.size();
+  uint32_t totalSamples = 0;
+  for (size_t i = 0; i < fileIndexes.size(); ++i) {
+    fs->getFileName(fileIndexes[i], name, PFILENAME_SIZE);
+    if (fs->getFileType(fileIndexes[i]) != PFT_FILE) {
+      continue;
+    }
+    if (strlen(name) > MAX_INSTRUMENT_FILENAME_LENGTH) {
+      continue;
+    }
+    totalSamples++;
+  }
 
   // store for ui updates
   importCount = totalSamples;
 
-  for (uint i = 0; i < totalSamples; i++) {
-    importIndex = i;
-    importName = name;
-
+  uint32_t loadedCount = 0;
+  for (size_t i = 0; i < fileIndexes.size(); i++) {
     fs->getFileName(fileIndexes[i], name, PFILENAME_SIZE);
+    importName = name;
     if (fs->getFileType(fileIndexes[i]) == PFT_FILE) {
       // Check if the filename exceeds the maximum allowed length
       if (strlen(name) > MAX_INSTRUMENT_FILENAME_LENGTH) {
@@ -80,17 +105,26 @@ void SamplePool::Load(const char *projectName) {
         continue;
       }
 
-      // Show progress as percentage
-      int progress = (int)((i * 100) / totalSamples);
-
-      updateStatus(importIndex, importCount, "Loading");
+      importIndex = loadedCount;
       loadSample(name);
+      progressBar_t progressBar;
+      const uint32_t processed = loadedCount + 1;
+      const uint32_t percentage =
+          (importCount > 0) ? (processed * 100U) / importCount : 100U;
+      const uint32_t cachedPercentage =
+          (processed > 0) ? (loadHitCount() * 100U) / processed : 0U;
+      fillProgressBar(processed, importCount, &progressBar);
+      Status::SetMultiLine("Loading %.19s" char_indicator_ellipsis_s
+                           " \n \n %s %3d%%  %3d%% cached",
+                           importName, progressBar, static_cast<int>(percentage),
+                           static_cast<int>(cachedPercentage));
+      loadedCount++;
     }
-    if (i == MAX_SAMPLES) {
+    if (loadedCount >= MAX_SAMPLES) {
       Trace::Error("Warning maximum sample count reached");
       break;
-    };
-  };
+    }
+  }
 
   // now sort the samples
   int rest = count_;
