@@ -44,7 +44,11 @@
  *   [MSB]       MIDI | HID | MSC | CDC          [LSB]
  */
 #define _PID_MAP(itf, n) ((CFG_TUD_##itf) << (n))
+#ifdef PICOTRACKER_DEBUG_CDC
+#define USB_PID 0x000B
+#else
 #define USB_PID 0x000A
+#endif
 //--------------------------------------------------------------------+
 // Device Descriptors
 //--------------------------------------------------------------------+
@@ -85,12 +89,22 @@ uint8_t const *tud_descriptor_device_cb(void) {
 enum {
   ITF_NUM_CDC = 0,
   ITF_NUM_CDC_DATA,
+#ifdef PICOTRACKER_DEBUG_CDC
+  ITF_NUM_CDC_DEBUG,
+  ITF_NUM_CDC_DEBUG_DATA,
+#endif
   ITF_NUM_MIDI,
   ITF_NUM_MIDI_STREAMING,
   ITF_NUM_TOTAL,
 };
+#ifdef PICOTRACKER_DEBUG_CDC
+#define CONFIG_TOTAL_LEN                                                       \
+  (TUD_CONFIG_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_CDC_DESC_LEN +               \
+   TUD_CDC_DESC_LEN)
+#else
 #define CONFIG_TOTAL_LEN                                                       \
   (TUD_CONFIG_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_CDC_DESC_LEN)
+#endif
 
 #if CFG_TUSB_MCU == OPT_MCU_LPC175X_6X ||                                      \
     CFG_TUSB_MCU == OPT_MCU_LPC177X_8X || CFG_TUSB_MCU == OPT_MCU_LPC40XX
@@ -108,6 +122,11 @@ enum {
 #define EPNUM_CDC_NOTIF 0x81
 #define EPNUM_CDC_OUT 0x02
 #define EPNUM_CDC_IN 0x82
+#ifdef PICOTRACKER_DEBUG_CDC
+#define EPNUM_CDC_DEBUG_NOTIF 0x83
+#define EPNUM_CDC_DEBUG_OUT 0x05
+#define EPNUM_CDC_DEBUG_IN 0x85
+#endif
 
 #endif
 uint8_t const desc_fs_configuration[] = {
@@ -119,6 +138,10 @@ uint8_t const desc_fs_configuration[] = {
     // address (out, in) and size.
     TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT,
                        EPNUM_CDC_IN, 64),
+#ifdef PICOTRACKER_DEBUG_CDC
+    TUD_CDC_DESCRIPTOR(ITF_NUM_CDC_DEBUG, 5, EPNUM_CDC_DEBUG_NOTIF, 8,
+                       EPNUM_CDC_DEBUG_OUT, EPNUM_CDC_DEBUG_IN, 64),
+#endif
 
     // Interface number, string index, EP Out & EP In address, EP size
     TUD_MIDI_DESCRIPTOR(ITF_NUM_MIDI, 0, EPNUM_MIDI, 0x80 | EPNUM_MIDI, 64)};
@@ -134,6 +157,10 @@ uint8_t const desc_hs_configuration[] = {
     // address (out, in) and size.
     TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 8, EPNUM_CDC_OUT,
                        EPNUM_CDC_IN, 512),
+#ifdef PICOTRACKER_DEBUG_CDC
+    TUD_CDC_DESCRIPTOR(ITF_NUM_CDC_DEBUG, 5, EPNUM_CDC_DEBUG_NOTIF, 8,
+                       EPNUM_CDC_DEBUG_OUT, EPNUM_CDC_DEBUG_IN, 512),
+#endif
     // Interface number, string index, EP Out & EP In address, EP size
     TUD_MIDI_DESCRIPTOR(ITF_NUM_MIDI, 0, EPNUM_MIDI, 0x80 | EPNUM_MIDI, 512)};
 #endif
@@ -160,7 +187,10 @@ char const *string_desc_arr[] = {
     "xiphonics, inc",           // 1: Manufacturer
     "PicoTracker",              // 2: Product
     "123456",                   // 3: Serials, should use chip ID
-    "TinyUSB CDC",              // 4: CDC Interface
+    "PicoTracker CDC",          // 4: Primary CDC interface
+#ifdef PICOTRACKER_DEBUG_CDC
+    "PicoTracker Debug CDC",    // 5: Debug CDC interface
+#endif
 };
 
 char id_out[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];

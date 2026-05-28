@@ -19,6 +19,7 @@
 #include "hardware/gpio.h"
 #include "input.h"
 #include "pico/rand.h"
+#include "tusb.h"
 #include <assert.h>
 #include <fcntl.h>
 #include <memory.h>
@@ -191,7 +192,20 @@ void picoTrackerSystem::PostQuitMessage() { eventManager_->PostQuitMessage(); }
 
 unsigned int picoTrackerSystem::GetMemoryUsage() { return 0; }
 
-void picoTrackerSystem::SystemPutChar(int c) { putchar(c); }
+void picoTrackerSystem::SystemPutChar(int c) {
+#ifdef PICOTRACKER_DEBUG_CDC
+  constexpr uint8_t kDebugCdcItf = 1;
+  if (tud_cdc_n_connected(kDebugCdcItf) &&
+      tud_cdc_n_write_available(kDebugCdcItf) > 0) {
+    tud_cdc_n_write_char(kDebugCdcItf, static_cast<char>(c));
+    if (c == '\n') {
+      tud_cdc_n_write_flush(kDebugCdcItf);
+    }
+    return;
+  }
+#endif
+  putchar(c);
+}
 
 uint32_t picoTrackerSystem::GetRandomNumber() { return get_rand_32(); }
 

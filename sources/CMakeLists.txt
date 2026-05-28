@@ -106,6 +106,7 @@ pico_set_float_implementation(${PROJECT_NAME} pico)
 # Enable ETL debug mode only for Debug builds
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_compile_definitions(ETL_DEBUG)
+  add_compile_definitions(PICOTRACKER_DEBUG_CDC)
 endif()
 
 
