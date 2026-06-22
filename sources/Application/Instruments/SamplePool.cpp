@@ -116,7 +116,8 @@ void SamplePool::Load(const char *projectName) {
       fillProgressBar(processed, importCount, &progressBar);
       Status::SetMultiLine("Loading %.19s" char_indicator_ellipsis_s
                            " \n \n %s %3d%%  %3d%% cached",
-                           importName, progressBar, static_cast<int>(percentage),
+                           importName, progressBar,
+                           static_cast<int>(percentage),
                            static_cast<int>(cachedPercentage));
       loadedCount++;
     }

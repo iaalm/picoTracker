@@ -156,6 +156,16 @@ bool SIDInstrument::Start(int c, unsigned char note, bool retrigger) {
 
   int osc = GetOsc();
 
+  // On a true note trigger (an instrument number was present on the row) we
+  // must restart the SID envelope. cRSID drives the ADSR purely from the gate
+  // bit's edge, so without resetting the channel the internal "previous gate"
+  // stays high across consecutive notes and the envelope never re-attacks
+  // (the whole line plays with a single ADSR). Resetting the channel clears the
+  // gate-tracking state so the upcoming gate=1 is seen as a rising edge.
+  if (retrigger) {
+    sid_->cRSID_resetChannel(osc);
+  }
+
   sid_->Register[0 + osc * 7] = sid_notes[note - 24] & 0xFF; // V1 Freq Lo
   sid_->Register[1 + osc * 7] = sid_notes[note - 24] >> 8;   // V1 Freq Hi
   sid_->Register[2 + osc * 7] = vpw_.GetInt() & 0xFF;        // V1 PW Lo
