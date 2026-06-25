@@ -53,7 +53,7 @@ public:
   virtual bool GetTableAutomation();
   virtual void GetTableState(TableSaveState &state);
   virtual void SetTableState(TableSaveState &state);
-  etl::ilist<Variable *> *Variables() { return &variables_; };
+  etl::ivector<Variable *> *Variables() { return &variables_; };
 
   bool IsMulti();
 
@@ -97,7 +97,7 @@ protected:
   void doKRateUpdate(int channel);
 
 private:
-  etl::list<Variable *, 21> variables_;
+  etl::vector<Variable *, 21> variables_;
 
   SoundSource *source_;
   __attribute__((section(".DTCMRAM"))) static struct renderParams

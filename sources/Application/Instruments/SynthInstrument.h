@@ -42,13 +42,13 @@ public:
   virtual bool GetTableAutomation();
   virtual void GetTableState(TableSaveState &state);
   virtual void SetTableState(TableSaveState &state);
-  etl::ilist<Variable *> *Variables() { return &variables_; };
+  etl::ivector<Variable *> *Variables() { return &variables_; };
 
 private:
   // Build a VoiceParams snapshot from the current Variable values.
   void buildParams(VoiceParams &p);
 
-  etl::list<Variable *, 40> variables_;
+  etl::vector<Variable *, 40> variables_;
 
   // routing
   Variable algorithm_;

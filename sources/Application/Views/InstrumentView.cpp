@@ -1426,7 +1426,7 @@ bool InstrumentView::checkInstrumentModified() {
   }
 
   // Get the list of variables for this instrument
-  etl::ilist<Variable *> *variables = instrument->Variables();
+  etl::ivector<Variable *> *variables = instrument->Variables();
   if (!variables) {
     return false;
   }
@@ -1451,7 +1451,7 @@ void InstrumentView::resetInstrumentToDefaults() {
   }
 
   // Get the list of variables for this instrument
-  etl::ilist<Variable *> *variables = instrument->Variables();
+  etl::ivector<Variable *> *variables = instrument->Variables();
   if (!variables) {
     return;
   }
