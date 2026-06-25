@@ -13,6 +13,8 @@ add_library(application_instruments
   SampleVariable.cpp
   SIDInstrument.cpp
   SoundSource.cpp
+  SynthInstrument.cpp
+  SynthVoice.cpp
   WavFile.cpp
   WavFileWriter.cpp
   WavHeader.cpp

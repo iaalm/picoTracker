@@ -19,6 +19,7 @@
 #include "MidiInstrument.h"
 #include "OpalInstrument.h"
 #include "SIDInstrument.h"
+#include "SynthInstrument.h"
 #include "System/io/Status.h"
 
 #define XML_DEBUG_LOGGING 0
@@ -26,7 +27,8 @@
 // Contain all instrument definition
 InstrumentBank::InstrumentBank()
     : Persistent("INSTRUMENTBANK"), sampleInstrumentPool_(),
-      midiInstrumentPool_(), sidInstrumentPool_(), opalInstrumentPool_() {
+      midiInstrumentPool_(), sidInstrumentPool_(), opalInstrumentPool_(),
+      synthInstrumentPool_() {
 
   for (size_t i = 0; i < instruments_.max_size(); i++) {
     instruments_[i] = &none_;
@@ -42,6 +44,7 @@ void InstrumentBank::Reset() {
   midiInstrumentPool_.release_all();
   sidInstrumentPool_.release_all();
   opalInstrumentPool_.release_all();
+  synthInstrumentPool_.release_all();
 
   for (size_t i = 0; i < instruments_.max_size(); i++) {
     instruments_[i] = &none_;
@@ -188,6 +191,16 @@ unsigned short InstrumentBank::GetNextAndAssignID(InstrumentType type,
     instruments_[id] = oi;
     return id;
   } break;
+  case IT_SYNTH: {
+    SynthInstrument *syn = synthInstrumentPool_.create();
+    if (syn == nullptr) {
+      Trace::Error("Synth INSTRUMENT EXHAUSTED!");
+      return NO_MORE_INSTRUMENT;
+    }
+    syn->Init();
+    instruments_[id] = syn;
+    return id;
+  } break;
   case IT_NONE:
     instruments_[id] = &none_;
     return id;
@@ -213,6 +226,9 @@ void InstrumentBank::releaseInstrument(unsigned short id) {
     break;
   case IT_OPAL:
     opalInstrumentPool_.destroy(instrument);
+    break;
+  case IT_SYNTH:
+    synthInstrumentPool_.destroy(instrument);
     break;
   case IT_NONE:
     // NA: None is a "singleton" so no need to release from pool
