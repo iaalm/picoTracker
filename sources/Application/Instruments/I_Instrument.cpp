@@ -11,9 +11,25 @@
 #include "../Model/Project.h"
 #include "Application/Utils/char.h"
 #include "System/Console/Trace.h"
+#include <strings.h>
 
 I_Instrument::~I_Instrument() {
   // Virtual destructor implementation
+}
+
+InstrumentType InstrumentTypeFromName(const char *name, InstrumentType unknown) {
+  if (!name || name[0] == '\0') {
+    return unknown;
+  }
+  if (!strcasecmp(name, "SYNTH")) {
+    return IT_SYNTH;
+  }
+  for (uint i = 0; i < IT_LAST; i++) {
+    if (!strcasecmp(name, InstrumentTypeNames[i])) {
+      return (InstrumentType)i;
+    }
+  }
+  return unknown;
 }
 
 void I_Instrument::SaveContent(tinyxml2::XMLPrinter *printer) {

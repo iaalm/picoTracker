@@ -234,6 +234,7 @@ void InstrumentView::onInstrumentChange() {
 };
 
 void InstrumentView::refreshInstrumentFields() {
+  ResetScroll();
   for (auto &f : intVarField_) {
     f.RemoveObserver(*this);
   }

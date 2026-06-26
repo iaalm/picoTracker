@@ -460,14 +460,9 @@ InstrumentType PersistencyService::DetectInstrumentType(const char *name) {
                  doc.attrval_);
 
       // Map the type string to InstrumentType enum
-      for (int i = 0; i < IT_LAST; i++) {
-        if (!strcasecmp(doc.attrval_, InstrumentTypeNames[i])) {
-          importedType = static_cast<InstrumentType>(i);
-          Trace::Log("PERSISTENCYSERVICE", "Mapped to instrument type: %d",
-                     importedType);
-          break;
-        }
-      }
+      importedType = InstrumentTypeFromName(doc.attrval_, IT_NONE);
+      Trace::Log("PERSISTENCYSERVICE", "Mapped to instrument type: %d",
+                 importedType);
     }
     hasAttr = doc.NextAttribute();
   }
@@ -515,14 +510,9 @@ PersistencyResult PersistencyService::ImportInstrument(I_Instrument *instrument,
                  doc.attrval_);
 
       // Map the type string to InstrumentType enum
-      for (int i = 0; i < IT_LAST; i++) {
-        if (!strcasecmp(doc.attrval_, InstrumentTypeNames[i])) {
-          importedType = static_cast<InstrumentType>(i);
-          Trace::Log("PERSISTENCYSERVICE", "Mapped to instrument type: %d",
-                     importedType);
-          break;
-        }
-      }
+      importedType = InstrumentTypeFromName(doc.attrval_, IT_NONE);
+      Trace::Log("PERSISTENCYSERVICE", "Mapped to instrument type: %d",
+                 importedType);
     }
     hasAttr = doc.NextAttribute();
   }

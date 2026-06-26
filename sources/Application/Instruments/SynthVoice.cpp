@@ -30,7 +30,7 @@ constexpr int kFMShift = 17;
 // Self-feedback strength per feedback step (0-7).
 constexpr int kFBShift = 12;
 // Final output headroom shift applied before clipping to int16.
-constexpr int kOutShift = 2;
+constexpr int kOutShift = 0;
 
 // Lookup tables -------------------------------------------------------------
 int16_t sineTable[kSineSize];

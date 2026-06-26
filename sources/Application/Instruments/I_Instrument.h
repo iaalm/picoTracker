@@ -29,7 +29,11 @@ enum InstrumentType {
   IT_LAST
 };
 static const char *InstrumentTypeNames[IT_LAST] = {
-    "NONE", "SAMPLE", "MIDI", "SID", "OPAL", "SYNTH"};
+    "NONE", "SAMPLE", "MIDI", "SID", "OPAL", "KX1"};
+
+// Map persisted TYPE attribute to enum (accepts legacy "SYNTH" saves).
+InstrumentType InstrumentTypeFromName(const char *name,
+                                      InstrumentType unknown = IT_SAMPLE);
 
 class I_Instrument : public VariableContainer,
                      public Observable,
