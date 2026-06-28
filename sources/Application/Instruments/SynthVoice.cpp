@@ -23,7 +23,7 @@ namespace {
 constexpr int kSampleRate = 44100;
 constexpr int kSineBits = 10;            // 1024-entry sine table
 constexpr int kSineSize = 1 << kSineBits; // 1024
-constexpr int kWaveAmp = 2047;           // operator output amplitude (+/-)
+constexpr int kWaveAmp = 8192;           // operator output amplitude (+/-)
 
 // How hard a modulator drives a carrier's phase. Higher = more aggressive FM.
 constexpr int kFMShift = 17;
