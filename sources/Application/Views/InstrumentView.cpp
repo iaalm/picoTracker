@@ -8,6 +8,7 @@
  */
 
 #include "InstrumentView.h"
+#include "Application/AppWindow.h"
 #include "Application/Instruments/MidiInstrument.h"
 #include "Application/Instruments/SIDInstrument.h"
 #include "Application/Instruments/SampleInstrument.h"
@@ -26,8 +27,10 @@
 #include "ModalDialogs/MessageBox.h"
 #include "ModalDialogs/TextInputModalView.h"
 #include "System/System/System.h"
+#include "Application/Utils/SynthParamHelp.h"
 #include <Application/Utils/stringutils.h>
 #include <cstdint>
+#include <cstring>
 #include <nanoprintf.h>
 
 static constexpr InstrumentType kMaxSelectableInstrumentType =
@@ -1213,6 +1216,55 @@ void InstrumentView::ProcessButtonMask(unsigned short mask, bool pressed) {
   }
 };
 
+FourCC InstrumentView::getFocusParamID() {
+  UIField *focus = GetFocus();
+  if (!focus || focus->IsStatic()) {
+    return FourCC::InstrumentCommandNone;
+  }
+
+  for (auto &f : intVarField_) {
+    if (&f == focus) {
+      return f.GetVariableID();
+    }
+  }
+  for (auto &f : bigHexVarField_) {
+    if (&f == focus) {
+      return f.GetVariableID();
+    }
+  }
+  for (auto &f : intVarOffField_) {
+    if (&f == focus) {
+      return f.GetVariableID();
+    }
+  }
+  for (auto &f : bitmaskVarField_) {
+    if (&f == focus) {
+      return f.GetVariableID();
+    }
+  }
+  return FourCC::InstrumentCommandNone;
+}
+
+void InstrumentView::printSynthParamHelp(FourCC param,
+                                         GUITextProperties props) {
+  if (param == FourCC::InstrumentCommandNone) {
+    return;
+  }
+
+  char **helpLegend = getSynthParamHelp(param);
+  if (!helpLegend[0] || helpLegend[0][0] == '\0') {
+    return;
+  }
+
+  char line[32];
+  DrawString(0, 0, "                           ", props);
+  DrawString(0, 1, "                               ", props);
+  DrawString(0, 0, helpLegend[0], props);
+  if (helpLegend[1] && helpLegend[1][0] != '\0') {
+    DrawString(0, 1, helpLegend[1], props);
+  }
+}
+
 void InstrumentView::DrawView() {
   Clear();
 
@@ -1230,8 +1282,12 @@ void InstrumentView::DrawView() {
   FieldView::Redraw();
   drawMap();
 
-  // Draw instrument type with special handling for SID and OPAL
   I_Instrument *instr = getInstrument();
+  if (instr && instr->GetType() == IT_SYNTH) {
+    printSynthParamHelp(getFocusParamID(), props);
+  }
+
+  // Draw instrument type with special handling for SID and OPAL
   if (instr) {
     InstrumentType type = instr->GetType();
     if (type == IT_SID || type == IT_OPAL) {

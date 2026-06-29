@@ -59,6 +59,8 @@ protected:
   void refreshInstrumentFields();
   void addNameTextField(I_Instrument *instr, GUIPoint &position);
   void handleInstrumentExport();
+  FourCC getFocusParamID();
+  void printSynthParamHelp(FourCC param, GUITextProperties props);
 
 private:
   void onConfirmInstrumentTypeChange(View &view, ModalView &dialog);
