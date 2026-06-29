@@ -74,6 +74,33 @@ VoiceParams MakeSawPad() {
   return p;
 }
 
+VoiceParams MakeSyncLead() {
+  VoiceParams p = DefaultVoiceParams();
+  // Algo 0: only op1 is heard; op2/op3 level 0 => no FM smear, op2 only drives sync.
+  p.algorithm = 0;
+  p.op1_wave = SYNTH_WAVE_SAW;
+  p.op2_wave = SYNTH_WAVE_SINE;
+  p.op3_wave = SYNTH_WAVE_SINE;
+  p.op1_level = 0xFF;
+  p.op2_level = 0x00;
+  p.op3_level = 0x00;
+  p.op2_ratio = 4; // master must be >1x or sync is inaudible
+  p.op1_ad = SynthAd(0, 2);
+  p.op1_sr = SynthSr(0xD, 7);
+  p.filt_cutoff = 0x280;
+  p.filt_reso = 0x7;
+  p.filt_mode = SYNTH_FLT_LP;
+  p.filt_env_depth = 72;
+  p.filt_ad = SynthAd(0, 3);
+  p.filt_sr = SynthSr(0xB, 8);
+  p.pitch_depth = 5;
+  p.pitch_ad = SynthAd(0, 4);
+  p.porta_rate = 0x70;
+  p.mod_flags = SYNTH_MF_HARDSYNC;
+  p.volume = 0xE0;
+  return p;
+}
+
 static const NoteEvent kArpCeg[] = {
     {0.0f, 60, true, false},
     {0.4f, 64, true, false},
@@ -86,6 +113,14 @@ static const NoteEvent kLegatoSlide[] = {
     {0.0f, 60, true, false},
     {0.8f, 67, false, false},
     {1.6f, 72, false, false},
+    {2.4f, 0, false, true},
+};
+
+static const NoteEvent kSyncSweep[] = {
+    {0.0f, 48, true, false},
+    {0.6f, 55, false, false},
+    {1.2f, 60, false, false},
+    {1.8f, 67, false, false},
     {2.4f, 0, false, true},
 };
 
@@ -107,6 +142,8 @@ SynthPresetEntry gEntries[] = {
      kArpCeg, sizeof(kArpCeg) / sizeof(kArpCeg[0])},
     {"legato_slide", "Legato pitch slide sequence", 60, 0.f, DefaultVoiceParams,
      kLegatoSlide, sizeof(kLegatoSlide) / sizeof(kLegatoSlide[0])},
+    {"sync_lead", "Hard-sync saw sweep (needs legato slides)", 48, 0.f,
+     MakeSyncLead, kSyncSweep, sizeof(kSyncSweep) / sizeof(kSyncSweep[0])},
 };
 
 SynthPreset gResolved[sizeof(gEntries) / sizeof(gEntries[0])];
