@@ -93,25 +93,25 @@ methods, so the migration is staged.
 class I_Instrument {
 public:
   // --- Core ---
-  virtual int GetParamCount() const = 0;
-  virtual FourCC GetParamID(int idx) const = 0;
-  virtual const char *GetParamName(int idx) const = 0;
-  virtual const char *GetParamFormat(int idx) const = 0;
+  virtual int GetParamCount() const;          // default impl in I_Instrument.cpp
+  virtual FourCC GetParamID(int idx) const;
+  virtual const char *GetParamName(int idx) const;
+  virtual const char *GetParamFormat(int idx) const;
 
   // --- Range and stepping ---
-  virtual int GetParamMin(int idx) const = 0;
-  virtual int GetParamMax(int idx) const = 0;
-  virtual int GetParamDefault(int idx) const = 0;
-  virtual int GetParamStep(int idx) const = 0;
-  virtual int GetParamBigStep(int idx) const = 0;
+  virtual int GetParamMin(int idx) const;
+  virtual int GetParamMax(int idx) const;
+  virtual int GetParamDefault(int idx) const;
+  virtual int GetParamStep(int idx) const;
+  virtual int GetParamBigStep(int idx) const;
 
   // --- Read / write ---
-  virtual int GetParamValue(int idx) const = 0;
-  virtual void SetParamValue(int idx, int v) = 0;
+  virtual int GetParamValue(int idx) const;
+  virtual void SetParamValue(int idx, int v);
 
   // --- State ---
-  virtual bool IsParamModified(int idx) const = 0;
-  virtual void ResetParam(int idx) = 0;
+  virtual bool IsParamModified(int idx) const;
+  virtual void ResetParam(int idx);
   virtual void ResetAllParams() = 0;
 
   // --- Optional: variables list (legacy) ---
@@ -221,46 +221,75 @@ which is XIP'd from flash.
 
 ---
 
-## 5. `ParamRef` UI adapter
+## 5. New `UIField` derived classes
 
 The `UIField` family (`UIIntVarField`, `UIBigHexVarField`,
-`UIIntVarOffField`, `UIBitmaskVarField`) currently binds to `Variable&`.
-We add a parallel binding to a `ParamRef` without changing the
-existing `Variable&` constructors.
+`UIIntVarOffField`, `UIBitmaskVarField`) currently binds to
+`Variable&`. We add **a new set of parallel classes** that bind to
+the new `I_Instrument` parameter API by `(instrument pointer, idx)`.
+The existing `Variable&` constructors are **kept unchanged** so legacy
+instruments (those still using Variable members) keep working without
+modification to the field layer.
+
+The new classes live alongside their `Variable&` counterparts in
+`sources/Application/Views/BaseClasses/`:
 
 ```cpp
-// sources/Foundation/Variables/ParamRef.h
-#pragma once
-#include "Application/Instruments/I_Instrument.h"
-
-class ParamRef {
-  I_Instrument *instr_;
-  int idx_;
+// sources/Application/Views/BaseClasses/UIParamIntVarField.h
+class UIParamIntVarField : public UIIntVarField {
 public:
-  constexpr ParamRef(I_Instrument *instr, int idx) : instr_(instr), idx_(idx) {}
-
-  int  GetInt() const    { return instr_->GetParamValue(idx_); }
-  void SetInt(int v)     { instr_->SetParamValue(idx_, v); }
-  bool GetBool() const   { return GetInt() != 0; }
-  void SetBool(bool b)   { SetInt(b ? 1 : 0); }
-  bool IsModified() const { return instr_->IsParamModified(idx_); }
-  void Reset()           { instr_->ResetParam(idx_); }
-  FourCC GetID() const   { return instr_->GetParamID(idx_); }
+  UIParamIntVarField(GUIPoint position, I_Instrument *instr, int idx,
+                     const char *format, int min, int max, int step,
+                     int bigStep, int offset = 0);
+  // Inherits all of UIIntVarField's draw/input behaviour, but
+  // overrides GetVariableID() to return instr_->GetParamID(idx),
+  // and overrides GetVariable() / SetVariableValue() to call
+  // instr_->GetParamValue(idx) / SetParamValue(idx, v).
 };
 ```
 
-`UIField` subclasses gain a constructor overload that takes a
-`ParamRef` in place of the `Variable&`. They store the `ParamRef` by
-value (16 B on RP2040: 4 B pointer + 4 B idx + alignment). At draw
-time, they call `paramRef_.GetInt()`; at user-input time, they call
-`paramRef_.SetInt(v)`.
+The four new classes mirror the existing four:
 
-A `ParamRef` is short-lived. It is constructed by
-`InstrumentView::fillXxxParameters` during a `refreshInstrumentFields`
-call, stored by value in the UIField, and discarded when the
-`fieldList_` is cleared. **It does not outlive the instrument edit
-session**, so the lifetime is bounded by the field view's rebuild
-cycle, which already drops all field references on instrument change.
+| New class | Mirrors |
+|---|---|
+| `UIParamIntVarField` | `UIIntVarField` |
+| `UIParamBigHexVarField` | `UIBigHexVarField` |
+| `UIParamIntVarOffField` | `UIIntVarOffField` |
+| `UIParamBitmaskVarField` | `UIBitmaskVarField` |
+
+Each is a thin override of the corresponding `UIField` subclass. The
+internal storage is `(I_Instrument *instr_; int idx_;)` instead of
+`(Variable &v_)`. The drawing, scrolling, and input-handling logic
+in the base classes is reused.
+
+### 5.1 Lifetime
+
+The new classes are short-lived. `InstrumentView::fillXxxParameters`
+constructs them during `refreshInstrumentFields`, they are stored by
+value in `fieldList_`, and they are dropped when the field list is
+cleared (which happens on every instrument type change). **They do
+not outlive the instrument edit session**, so the lifetime is bounded
+by the field view's rebuild cycle, which already drops all field
+references on instrument change.
+
+### 5.2 Why a new class rather than a `ParamRef` adapter
+
+The original draft proposed a `ParamRef` adapter and an additional
+constructor overload on the existing `UIField` classes. The user
+chose the new-class approach for two reasons:
+
+1. **Cleaner type identity.** `UIParamIntVarField` is unambiguously
+   "a field bound to the new API". A `ParamRef` overload of
+   `UIIntVarField` would mix two storage models under one class
+   name, which makes static analysis and grep harder.
+2. **Easier migration of the field layer later.** If the legacy
+   `Variable&` paths are eventually removed (stage 8), the
+   `UIIntVarField` class shrinks to a single set of constructors,
+   and the `UIParam*` classes become the only path. Splitting
+   classes now makes that final cut cleaner.
+
+The implementation cost is roughly the same as the `ParamRef`
+approach — the new classes are mostly inheritance.
 
 ---
 
@@ -399,9 +428,13 @@ end of every stage.
 
 ### Stage 0 — Add the new API surface
 
-- Modify `I_Instrument.h` to add the new pure-virtual method
-  declarations.
-- Every existing concrete instrument will fail to compile.
+- Modify `I_Instrument.h` to add the new method declarations.
+- Provide default implementations in `I_Instrument.cpp` that adapt
+  the legacy `Variables()` list to the new index-based API.
+- Methods are **non-pure-virtual** in stage 0 so the build stays
+  green. They become `= 0` only in stage 7.
+- Every existing concrete instrument inherits the defaults and
+  works unchanged.
 
 ### Stage 0.5 — Facade the new API on legacy instruments
 
@@ -411,12 +444,16 @@ end of every stage.
   storage change). The facade is a thin shim.
 - The codebase compiles. Behaviour is unchanged.
 
-### Stage 0.6 — Add `ParamRef` and `UIField` overloads
+### Stage 0.6 — Add the new `UIParam*` field classes
 
-- New `ParamRef` class.
-- `UIIntVarField`, `UIBigHexVarField`, `UIIntVarOffField`,
-  `UIBitmaskVarField` each gain a `ParamRef` constructor overload.
-- Old `Variable&` constructor paths still work.
+- New `UIParamIntVarField`, `UIParamBigHexVarField`,
+  `UIParamIntVarOffField`, `UIParamBitmaskVarField` classes. Each
+  is a thin subclass of the corresponding existing `UIField` class
+  that overrides `GetVariableID()`, `GetVariable()` and
+  `SetVariableValue()` to delegate to the new `I_Instrument` API.
+- Old `Variable&` constructor paths still work; existing
+  `fillXxxParameters` callsites that bind to legacy instruments
+  are not touched.
 
 ### Stage 0.7 — Switch persistence to new API
 
@@ -431,57 +468,102 @@ end of every stage.
   confirm round-trip. Run a project on each instrument type and
   confirm the UI behaves identically to the pre-stage-0 build.
 
-### Stage 1 — Migrate `SynthInstrument`
+### Stage 1 — Migrate `SIDInstrument` (first per user decision)
+
+- Replace `SIDInstrument`'s 19 `Variable` members with
+  `int32_t params_[20]` (1 name + 19 params).
+- Implement the new API directly on the packed array.
+- Add `SPECS`, `NAMES`, `FORMATS` static tables.
+- Update `InstrumentView::fillSIDParameters` to use the new
+  `UIParam*` classes.
+- Update `SIDInstrument::Start` / `ProcessCommand` to read from the
+  packed array via index.
+- The static `cRSID sid1_/sid2_` chip emulator state is **not**
+  touched (it lives outside the parameter API).
+- Measure `sizeof(SIDInstrument)` before and after. Confirm
+  `etl::pool<SIDInstrument, 3>` savings.
+- This is the **first real migration** — the validation case that
+  proves the pattern works end-to-end.
+
+### Stage 2 — Migrate `OpalInstrument`
+
+- Replace 16 `Variable` members with `int32_t params_[17]`.
+- Migrate `fillOpalParameters` to the new `UIParam*` classes.
+- The embedded `Opal` DSP class is **not** touched; only the
+  instrument parameter layer changes.
+- Measure `sizeof` delta.
+
+### Stage 3 — Migrate `SynthInstrument`
 
 - Replace 35 `Variable` members with `int32_t params_[36]`.
-- Implement new API directly on the packed array.
 - Update `SynthInstrument::buildParams` to read from the packed
-  array.
-- Update `InstrumentView::fillSynthParameters` to use `ParamRef`
-  bindings.
-- Measure `sizeof(SynthInstrument)` before and after. Confirm
-  `etl::pool<SynthInstrument, N>` savings.
-- This is the **first deliverable** for the user: real RAM numbers.
+  array via index. The mapping (`params_[0]` → `p.algorithm`,
+  `params_[1]` → `p.feedback`, ...) is a fixed table written
+  inline.
+- Update `fillSynthParameters` to use the new `UIParam*` classes.
+- Measure `sizeof` delta. This is the largest single pool saving.
 
-### Stages 2-7 — Migrate other instruments
+### Stage 4 — Migrate `SampleInstrument`
 
-One instrument per stage. Each stage:
-- Replace `Variable` members with packed array
-- Add `SPECS` / `NAMES` / `FORMATS` tables
-- Update `InstrumentView::fillXxxParameters` to use `ParamRef`
-- Add a focused unit test or `synth_render` regression
-- Update PR notes with `sizeof` deltas
+- Replace 20 of the 21 `Variable` members with `int32_t params_[21]`
+  (1 name + 20 packed params). The 21st variable is
+  `SampleInstrumentSample` (the sample-selection field), which
+  stays as a legacy `Variable` per §9.4.
+- `slicePoints_[16]` (64 B) stays as a separate field outside the
+  packed array.
+- `SampleVariable sample_` rendering controller stays as a
+  `Variable`.
+- Update `fillSampleParameters` to use the new `UIParam*` classes
+  for the 20 migrated parameters; the sample field continues to
+  use `UIIntVarField` with the legacy `Variable&`.
+- Measure `sizeof` delta.
 
-Order: Sample (highest pool savings), MIDI (simplest), SID
-(shared state care), OPAL (embedded DSP care).
+### Stage 5 — Migrate `MidiInstrument`
 
-### Stage 8 — Delete legacy `Variables()` and `VariableContainer`
+- Replace 7 `Variable` members with `int32_t params_[8]`.
+- Update `fillMidiParameters` to use the new `UIParam*` classes.
+- Measure `sizeof` delta.
+
+### Stage 6 — Final regression on Pico and Advance firmware
+
+- Full instrument-switching test for every type: SID, OPAL,
+  Synth, Sample, MIDI, None.
+- Persistence round-trip on every type.
+- Pool capacity tests at the planned new limits.
+- Per-channel voice state tests (KX1 with all 8 channels active).
+
+### Stage 7 — Delete legacy `Variables()` and `VariableContainer`
 
 - `I_Instrument::Variables()` returns `nullptr` always.
 - `VariableContainer` base is removed from `I_Instrument`.
 - `findInstrumentVariable` and friends that iterate `Variables()`
   are deleted.
 - Legacy `Variable*` overloads in `UIField` are deleted; only the
-  `ParamRef` overloads remain.
+  new `UIParam*` classes remain.
+- The `Variable` class itself is **not** removed — it is still used
+  by the `SampleVariable` rendering controller and by the
+  instrument name plumbing in the legacy path.
 
-### Stage 9 — Documentation and final regression
+### Stage 8 — Documentation and final pass
 
 - Update `docs/DEV.md` to describe the parameter model.
 - Update `usermanual/` for any user-visible changes (none expected).
 - Full regression on Pico and Advance firmware.
+- Tag the migration as complete.
 
 ---
 
 ## 9. Cross-cutting decisions
 
-### 9.1 SID and OPAL retirement
+### 9.1 SID and OPAL are kept and migrated first
 
-Per the prior audit and discussion, the Advance branch already raises
-`MAX_SYNTHINSTRUMENT_COUNT` to 8 with SID/OPAL still at 3. This
-redesign is **agnostic** to whether SID/OPAL stay: their migration
-follows the same path. If the team chooses to drop SID/OPAL entirely
-as part of the broader product direction, the corresponding stages are
-simply skipped.
+Per user decision, SID and OPAL are not retired. They are migrated
+to the new param API **first** (stages 1 and 2) — the rationale is
+that they are the simplest real instruments with non-trivial
+parameter sets, so they validate the migration pattern before the
+larger Sample and Synth migrations. SID/OPAL continue to exist in
+the master and Advance builds with their existing pool sizes
+(`MAX_SIDINSTRUMENT_COUNT = 0x03`, `MAX_OPALINSTRUMENT_COUNT = 0x03`).
 
 ### 9.2 KX1 lookup table `const` fix
 
@@ -543,7 +625,7 @@ This headroom can be spent on:
 
 | Risk | Probability | Impact | Mitigation |
 |---|---|---|---|
-| `ParamRef` outlives the instrument (UI field holds a stale ref) | Medium | High | `InstrumentView::refreshInstrumentFields` already clears `fieldList_` on instrument change. The new `ParamRef` binding is dropped with the fields. |
+| `UIParam*` field outlives the instrument (UI field holds a stale instrument pointer / idx) | Medium | High | `InstrumentView::refreshInstrumentFields` already clears `fieldList_` on instrument change. The new field bindings are dropped with the field list. |
 | Persistence regression on old `.pti` files | Low | High | Restore is name-based, not index-based. Reordering the spec table is safe. Format strings match the old ones. |
 | SetParamValue not triggering UI redraw | Medium | Medium | The new base-class `SetParamValue` calls `NotifyObservers` on change. UI fields re-read on the next draw. Already tested pattern in `Observable`. |
 | `SampleInstrument` slice points and `SampleVariable` accidentally moved into packed array | Low | High | Slice points stay as a separate field; `SampleVariable` stays as a `Variable`. Migration script enumerates which `Variable` members move; the rest are annotated as "non-migrated". |
@@ -553,22 +635,27 @@ This headroom can be spent on:
 
 ---
 
-## 12. Open questions
+## 12. Decisions
 
-1. **Old `Variables()` interface** — keep until stage 8 (current plan)
-   or remove earlier? Keeping until stage 8 is safer but keeps the
-   dual-path complexity longer.
-2. **`ParamRef` vs new `UIField` derived class** — `ParamRef` is
-   smaller change (additive constructor overload on existing
-   subclasses). New derived class is more invasive but cleaner
-   separation. **Plan: `ParamRef`.**
-3. **Name at idx 0** — current plan. Alternative is to keep the
-   instrument name outside the param array as a separate field.
-4. **Sample field** — keep as legacy `Variable` for now (current
-   plan), or invest in the richer format API and migrate it?
-5. **SID/OPAL migration order** — migrate (preserve), drop outright,
-   or keep as `Variable`-only legacy? The pool savings from migration
-   are small (1-2 KB) compared to the engineering cost.
+All open questions resolved:
+
+1. **Old `Variables()` interface** — kept until **stage 7** (when the
+   legacy `Variable&` UI fields are deleted). The dual-path
+   complexity is acceptable for the migration period.
+2. **UIField design** — **new derived classes** (`UIParamIntVarField`,
+   `UIParamBigHexVarField`, `UIParamIntVarOffField`,
+   `UIParamBitmaskVarField`). Cleaner type identity and easier
+   final cut in stage 7.
+3. **Name at idx 0** — **yes**, the instrument name is the first
+   parameter in every instrument's spec table. Persistence
+   round-trips old `.pti` files correctly.
+4. **Sample field** — **deferred** to a follow-up redesign. The
+   `SampleInstrumentSample` parameter stays as a legacy `Variable`
+   through stage 7. The other 20 SampleInstrument parameters are
+   migrated in stage 4.
+5. **SID/OPAL** — **migrated, kept**, and **first** in the order.
+   They validate the migration pattern before Sample and Synth
+   because their parameter sets are small but non-trivial.
 
 ---
 
@@ -577,18 +664,19 @@ This headroom can be spent on:
 | Stages | Description | Duration | Cumulative |
 |---|---|---|---|
 | 0–0.8 | New API + facades + UI + persistence switch | 1.5 weeks | 1.5 weeks |
-| 1 | Synth migration + first RAM numbers | 1 week | 2.5 weeks |
-| 2 | Sample migration | 1 week | 3.5 weeks |
-| 3 | MIDI migration | 0.5 week | 4 weeks |
-| 4 | SID migration | 1 week | 5 weeks |
-| 5 | OPAL migration | 1 week | 6 weeks |
+| 1 | SID migration + first RAM numbers | 1 week | 2.5 weeks |
+| 2 | OPAL migration | 1 week | 3.5 weeks |
+| 3 | Synth migration | 1 week | 4.5 weeks |
+| 4 | Sample migration | 1 week | 5.5 weeks |
+| 5 | MIDI migration | 0.5 week | 6 weeks |
 | 6 | Final regression on Advance and Pico | 0.5 week | 6.5 weeks |
-| 7 | Stage 8: legacy path deletion | 1 week | 7.5 weeks |
+| 7 | Legacy path deletion (no `Variables()`, no `Variable&` UIFields) | 1 week | 7.5 weeks |
 | 8 | Documentation, final pass | 0.5 week | 8 weeks |
 
 **Total: ≈ 8 weeks for the full migration, deliverable as 8-9
 mergeable PRs.**
 
-If the team only wants Synth and Sample (the high-value cases), the
-critical-path is stages 0-2 plus verification: **≈ 3.5 weeks** to the
-first major checkpoint where ≈ 17 KB is reclaimed.
+If the team only wants the first 4 stages (SID, OPAL, Synth,
+Sample — the highest-value cases), the critical path is stages
+0-4 plus verification: **≈ 5.5 weeks** to the first major checkpoint
+where ≈ 27 KB is reclaimed.

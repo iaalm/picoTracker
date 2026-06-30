@@ -53,7 +53,7 @@ public:
   virtual bool GetTableAutomation();
   virtual void GetTableState(TableSaveState &state);
   virtual void SetTableState(TableSaveState &state);
-  etl::ivector<Variable *> *Variables() { return &variables_; };
+  const etl::ivector<Variable *> *Variables() const { return &variables_; };
 
   bool IsMulti();
 

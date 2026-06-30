@@ -134,3 +134,87 @@ void I_Instrument::Purge() {
     (*it)->Reset();
   }
 };
+
+// ---------------------------------------------------------------------------
+// New parameter API (Plan B, see docs/instrument-param-api.md).
+//
+// These default implementations adapt the legacy Variables() list to the
+// new index-based API. Instruments that have not yet migrated to packed
+// storage inherit these. Migrated instruments override them to read/write
+// a packed int32 array directly. The defaults are removed in stage 7.
+// ---------------------------------------------------------------------------
+
+int I_Instrument::GetParamCount() const {
+  return Variables() ? static_cast<int>(Variables()->size()) : 0;
+}
+
+FourCC I_Instrument::GetParamID(int idx) const {
+  return (*Variables())[idx]->GetID();
+}
+
+const char *I_Instrument::GetParamName(int idx) const {
+  return (*Variables())[idx]->GetName();
+}
+
+const char *I_Instrument::GetParamFormat(int idx) const {
+  // Generic default: decimal. Migrated instruments provide their own
+  // printf templates (e.g. "vol: %2.2X") via ParamSpec tables.
+  (void)idx;
+  return "%d";
+}
+
+int I_Instrument::GetParamMin(int idx) const {
+  (void)idx;
+  return 0;
+}
+
+int I_Instrument::GetParamMax(int idx) const {
+  (void)idx;
+  return 0xFFFF;
+}
+
+int I_Instrument::GetParamDefault(int idx) const {
+  // Variable does not expose its default externally. The migrated
+  // packed-storage path uses ParamSpec::default_ for an exact value.
+  return -1;
+}
+
+int I_Instrument::GetParamStep(int idx) const {
+  (void)idx;
+  return 1;
+}
+
+int I_Instrument::GetParamBigStep(int idx) const {
+  (void)idx;
+  return 1;
+}
+
+int I_Instrument::GetParamValue(int idx) const {
+  return (*Variables())[idx]->GetInt();
+}
+
+void I_Instrument::SetParamValue(int idx, int v) {
+  Variable *v_ptr = (*Variables())[idx];
+  if (v_ptr->GetInt() != v) {
+    v_ptr->SetInt(v);
+    // SetInt already calls SetChanged + NotifyObservers on the Variable.
+    // We additionally notify on the instrument so any instrument-level
+    // observers (InstrumentView) wake up.
+    SetChanged();
+    NotifyObservers();
+  }
+}
+
+bool I_Instrument::IsParamModified(int idx) const {
+  return (*Variables())[idx]->IsModified();
+}
+
+void I_Instrument::ResetParam(int idx) {
+  (*Variables())[idx]->Reset();
+}
+
+void I_Instrument::ResetAllParams() {
+  for (int i = 0; i < GetParamCount(); i++) {
+    ResetParam(i);
+  }
+}
