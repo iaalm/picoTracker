@@ -260,6 +260,27 @@ bool PersistencyDocument::NextAttribute() {
   return false;
 }
 
+bool PersistencyDocument::LoadFromBuffer(const uint8_t *data, size_t len) {
+  if (!data || len == 0) {
+    Trace::Error("PERSISTENCYDOCUMENT: empty buffer");
+    r_ = YXML_ESYN;
+    return false;
+  }
+
+  yxml_init(state_, stack_, sizeof(stack_));
+  r_ = YXML_OK;
+
+  for (size_t i = 0; i < len; ++i) {
+    r_ = yxml_parse(state_, data[i]);
+    if (r_ < YXML_OK) {
+      Trace::Error("PERSISTENCYDOCUMENT: buffer parse error %d at byte %zu",
+                   r_, i);
+      return false;
+    }
+  }
+  return true;
+}
+
 bool PersistencyDocument::HasContent() {
   // This is called after YXML_ELEMSTART, YXML_ATTREND or YXML_CONTENT
   if ((r_ != YXML_OK) && (r_ != YXML_ELEMSTART) && (r_ != YXML_ATTREND) &&

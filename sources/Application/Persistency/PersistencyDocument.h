@@ -19,6 +19,7 @@ public:
   PersistencyDocument();
   ~PersistencyDocument(); // Add destructor
   bool Load(const char *filename);
+  bool LoadFromBuffer(const uint8_t *data, size_t len);
   void Close(); // Add method to explicitly close the file
 
   // r_ < YXML_OK to signal that the xml parsing had a fatal error
