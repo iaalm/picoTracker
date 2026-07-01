@@ -79,25 +79,28 @@ const ParamSpec SIDInstrument::SPECS[SIDInstrument::kParamCount] = {
     {FourCC::SIDInstrument2Volume, 0, 17, 1, 0xF, 0, 0xF, 1, 1, 0, 0},
 };
 
+// NAMES use the legacy FourCC::c_str() values so existing .pti files (saved
+// with the pre-stage-1 Variable-based format) load correctly via
+// FindParamByName. Saving a migrated instrument produces the same names.
 const char *const SIDInstrument::NAMES[SIDInstrument::kParamCount] = {
     /*  0 */ "InstrumentName",
-    /*  1 */ "SIDInstrumentPulseWidth",
-    /*  2 */ "SIDInstrumentWaveform",
-    /*  3 */ "SIDInstrumentVSync",
-    /*  4 */ "SIDInstrumentRingModulator",
-    /*  5 */ "SIDInstrumentADSR",
-    /*  6 */ "SIDInstrumentFilterOn",
-    /*  7 */ "SIDInstrumentTable",
-    /*  8 */ "SIDInstrumentTableAutomation",
-    /*  9 */ "SIDInstrumentOSCNumber",
-    /* 10 */ "SIDInstrument1FilterCut",
-    /* 11 */ "SIDInstrument1FilterResonance",
-    /* 12 */ "SIDInstrument1FilterMode",
-    /* 13 */ "SIDInstrument1Volume",
-    /* 14 */ "SIDInstrument2FilterCut",
-    /* 15 */ "SIDInstrument2FilterResonance",
-    /* 16 */ "SIDInstrument2FilterMode",
-    /* 17 */ "SIDInstrument2Volume",
+    /*  1 */ "VPW",
+    /*  2 */ "VWF",
+    /*  3 */ "VSYNC",
+    /*  4 */ "VRING",
+    /*  5 */ "VADSR",
+    /*  6 */ "VFON",
+    /*  7 */ "table",
+    /*  8 */ "table automation",
+    /*  9 */ "OSCNUM",
+    /* 10 */ "FILTCUT1",
+    /* 11 */ "RES1",
+    /* 12 */ "FMODE1",
+    /* 13 */ "DIP_VOLUME1",
+    /* 14 */ "FILTCUT2",
+    /* 15 */ "RES2",
+    /* 16 */ "FMODE2",
+    /* 17 */ "DIP_VOLUME2",
 };
 
 // All persistence formats use plain decimal — keeps RestoreContent simple

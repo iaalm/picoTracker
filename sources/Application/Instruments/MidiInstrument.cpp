@@ -51,12 +51,12 @@ const ParamSpec MidiInstrument::SPECS[MidiInstrument::kParamCount] = {
 
 const char *const MidiInstrument::NAMES[MidiInstrument::kParamCount] = {
     /*  0 */ "InstrumentName",
-    /*  1 */ "MidiInstrumentChannel",
-    /*  2 */ "MidiInstrumentNoteLength",
-    /*  3 */ "MidiInstrumentVolume",
-    /*  4 */ "MidiInstrumentTable",
-    /*  5 */ "MidiInstrumentTableAutomation",
-    /*  6 */ "MidiInstrumentProgram",
+    /*  1 */ "channel",
+    /*  2 */ "note length",
+    /*  3 */ "volume",
+    /*  4 */ "table",
+    /*  5 */ "table automation",
+    /*  6 */ "program",
     /*  7 */ "MidiInstrumentUnused",
 };
 
