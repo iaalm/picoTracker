@@ -18,8 +18,13 @@
 class UIBitmaskVarField : public UIIntVarField {
 
 public:
-  UIBitmaskVarField(const GUIPoint &position, Variable &v, const char *format,
+  // Nullable pointer overload (stage 0.6+). Used by UIParamBitmaskVarField.
+  UIBitmaskVarField(const GUIPoint &position, Variable *v, const char *format,
                     int len);
+  // Legacy Variable& overload kept for existing call sites.
+  UIBitmaskVarField(const GUIPoint &position, Variable &v, const char *format,
+                    int len)
+      : UIBitmaskVarField(position, &v, format, len) {}
   virtual ~UIBitmaskVarField(){};
   virtual void Draw(GUIWindow &w, int offset = 0);
   virtual void ProcessArrow(unsigned short mask);

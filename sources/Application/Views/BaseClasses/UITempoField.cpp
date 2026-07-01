@@ -41,7 +41,7 @@ void UITempoField::Update(Observable &, I_ObservableData *data) {
 }
 
 void UITempoField::ProcessArrow(unsigned short mask) {
-  int value = src_.GetInt();
+  int value = ReadInt();
 
   switch (mask) {
   case EPBM_UP:
@@ -64,7 +64,7 @@ void UITempoField::ProcessArrow(unsigned short mask) {
     value = max_;
   }
 
-  src_.SetInt(value);
+  WriteInt(value);
 };
 
 void UITempoField::ProcessEditArrow(unsigned short mask) {

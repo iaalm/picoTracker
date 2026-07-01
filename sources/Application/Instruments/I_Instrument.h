@@ -182,5 +182,19 @@ public:
   // Persistent implementation
   virtual void SaveContent(tinyxml2::XMLPrinter *printer) override;
   virtual void RestoreContent(PersistencyDocument *doc) override;
+
+protected:
+  // Linear search for a parameter by its display/persistence name. Used by
+  // RestoreContent and by callers that hold a FourCC or string name and want
+  // to map it to a parameter index. For ≤ 36 params this is faster than
+  // building a hash table. Returns -1 when the name is not in this
+  // instrument's spec table.
+  int FindParamByName(const char *name) const;
+
+  // Format a parameter value at idx into a persistence-friendly string.
+  // For legacy (stage 0.5) instruments this delegates to the bound
+  // Variable::GetString() to preserve the on-disk format; for migrated
+  // (stage 1+) instruments it uses GetParamFormat(idx) + GetParamValue(idx).
+  const char *FormatParamValue(int idx, char *buf, size_t bufsize) const;
 };
 #endif

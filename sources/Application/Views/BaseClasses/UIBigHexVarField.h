@@ -16,9 +16,16 @@
 class UIBigHexVarField : public UIIntVarField {
 
 public:
-  UIBigHexVarField(const GUIPoint &position, Variable &v, int precision,
+  // Nullable pointer overload (stage 0.6+). Used by UIParamBigHexVarField.
+  UIBigHexVarField(const GUIPoint &position, Variable *v, int precision,
                    const char *format, int min, int max, int power,
                    bool wrap = false);
+  // Legacy Variable& overload kept unchanged for existing call sites.
+  UIBigHexVarField(const GUIPoint &position, Variable &v, int precision,
+                   const char *format, int min, int max, int power,
+                   bool wrap = false)
+      : UIBigHexVarField(position, &v, precision, format, min, max, power,
+                         wrap) {}
   virtual ~UIBigHexVarField(){};
   virtual void Draw(GUIWindow &w, int offset = 0);
   virtual void ProcessArrow(unsigned short mask);

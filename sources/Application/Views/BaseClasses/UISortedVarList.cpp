@@ -17,13 +17,13 @@ UISortedVarList::UISortedVarList(const GUIPoint &position, Variable &v,
 };
 
 void UISortedVarList::ProcessArrow(unsigned short mask) {
-  int value = src_.GetInt();
+  int value = ReadInt();
 
   switch (mask) {
   case EPBM_UP:
     //			HERE
     /*			// Look for the first in next alphabet
-                            char search=src_.GetString()[0] ;
+                            char search=ReadString()[0] ;
 
                             value+=yOffset_ ;
     */
@@ -46,5 +46,5 @@ void UISortedVarList::ProcessArrow(unsigned short mask) {
     value = max_;
   }
 
-  src_.SetInt(value);
+  WriteInt(value);
 };

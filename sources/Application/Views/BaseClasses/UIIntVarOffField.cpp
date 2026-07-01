@@ -13,14 +13,14 @@
 #include <System/Console/nanoprintf.h>
 #include <string.h>
 
-UIIntVarOffField::UIIntVarOffField(const GUIPoint &position, Variable &v,
+UIIntVarOffField::UIIntVarOffField(const GUIPoint &position, Variable *v,
                                    const char *format, int min, int max,
                                    int xOffset, int yOffset)
     : UIIntVarField(position, v, format, min, max, xOffset, yOffset) {}
 
 void UIIntVarOffField::ProcessArrow(unsigned short mask) {
 
-  int value = src_.GetInt();
+  int value = ReadInt();
 
   if (value == VAR_OFF) { // Off state
     switch (mask) {
@@ -53,11 +53,11 @@ void UIIntVarOffField::ProcessArrow(unsigned short mask) {
       value = max_;
     }
   }
-  src_.SetInt(value);
+  WriteInt(value);
 
   SetChanged();
   NotifyObservers(reinterpret_cast<I_ObservableData *>(
-      static_cast<uintptr_t>(src_.GetID())));
+      static_cast<uintptr_t>(GetVariableID())));
 };
 
 void UIIntVarOffField::Draw(GUIWindow &w, int offset) {
@@ -66,11 +66,11 @@ void UIIntVarOffField::Draw(GUIWindow &w, int offset) {
   GUIPoint position = GetPosition();
   position._y += offset;
 
-  Variable::Type type = src_.GetType();
+  Variable::Type type = ReadType();
   char buffer[MAX_FIELD_WIDTH + 1];
   switch (type) {
   case Variable::INT: {
-    int ivalue = src_.GetInt();
+    int ivalue = ReadInt();
     if (ivalue != VAR_OFF) {
       npf_snprintf(buffer, sizeof(buffer), format_, ivalue, ivalue);
     } else {

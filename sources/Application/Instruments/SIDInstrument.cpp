@@ -34,49 +34,94 @@ SIDInstrument *SIDInstrument::SID1RenderMaster = 0;
 cRSID SIDInstrument::sid2_(44100);
 SIDInstrument *SIDInstrument::SID2RenderMaster = 0;
 
-Variable SIDInstrument::fltcut1_(FourCC::SIDInstrument1FilterCut, 0x1FF);
-Variable SIDInstrument::fltres1_(FourCC::SIDInstrument1FilterResonance, 0x0);
-Variable SIDInstrument::fltmode1_(FourCC::SIDInstrument1FilterMode,
-                                  sidFilterModeText, DFM_LAST, 0x0);
-Variable SIDInstrument::vol1_(FourCC::SIDInstrument1Volume, 0xF);
+// ---------------------------------------------------------------------------
+// Plan B: static ParamSpec / NAMES / FORMATS tables for SIDInstrument.
+//
+// Each ParamSpec takes 12 B in flash. The NAMES / FORMATS arrays are
+// deduplicated by the (name_off, format_off) offset pair so repeated formats
+// (e.g. "%d" for all decimals) share a single string entry.
+// ---------------------------------------------------------------------------
 
-Variable SIDInstrument::fltcut2_(FourCC::SIDInstrument2FilterCut, 0x1FF);
-Variable SIDInstrument::fltres2_(FourCC::SIDInstrument2FilterResonance, 0x0);
-Variable SIDInstrument::fltmode2_(FourCC::SIDInstrument2FilterMode,
-                                  sidFilterModeText, DFM_LAST, 0x0);
-Variable SIDInstrument::vol2_(FourCC::SIDInstrument2Volume, 0xF);
+// ParamSpec positional layout (matches ParamSpec.h):
+//   id (FourCC), _pad0 (u8), name_off (u16), format_off (u16),
+//   default_ (i16), min (u16), max (u16), step (u8), big_step (u8), _pad1 (u8)
+const ParamSpec SIDInstrument::SPECS[SIDInstrument::kParamCount] = {
+    // [0] reserved name slot
+    {FourCC::InstrumentName, 0, 0, 0, 0, 0, 0, 1, 1, 0},
+    // [1] PulseWidth
+    {FourCC::SIDInstrumentPulseWidth, 0, 1, 1, 0x800, 0, 0xFFF, 1, 0x10, 0},
+    // [2] Waveform (CHAR_LIST)
+    {FourCC::SIDInstrumentWaveform, 0, 2, 1, 0x1, 0, DWF_LAST - 1, 1, 1, 0},
+    // [3] VSync (bool)
+    {FourCC::SIDInstrumentVSync, 0, 3, 1, 0, 0, 1, 1, 1, 0},
+    // [4] RingModulator (bool)
+    {FourCC::SIDInstrumentRingModulator, 0, 4, 1, 0, 0, 1, 1, 1, 0},
+    // [5] ADSR
+    {FourCC::SIDInstrumentADSR, 0, 5, 1, 0x2282, 0, 0xFFFF, 1, 0x10, 0},
+    // [6] FilterOn (bool)
+    {FourCC::SIDInstrumentFilterOn, 0, 6, 1, 0, 0, 1, 1, 1, 0},
+    // [7] Table (default -1 == "no table bound")
+    {FourCC::SIDInstrumentTable, 0, 7, 1, -1, 0, 0x7F, 1, 0x10, 0},
+    // [8] TableAutomation (bool)
+    {FourCC::SIDInstrumentTableAutomation, 0, 8, 1, 0, 0, 1, 1, 1, 0},
+    // [9] OSCNumber
+    {FourCC::SIDInstrumentOSCNumber, 0, 9, 1, 0, 0, 2, 1, 1, 0},
+    // [10..13] SID1 filter/volume
+    {FourCC::SIDInstrument1FilterCut, 0, 10, 1, 0x1FF, 0, 0x7FF, 1, 0x10, 0},
+    {FourCC::SIDInstrument1FilterResonance, 0, 11, 1, 0, 0, 0xF, 1, 1, 0},
+    {FourCC::SIDInstrument1FilterMode, 0, 12, 1, 0, 0, DFM_LAST - 1, 1, 1, 0},
+    {FourCC::SIDInstrument1Volume, 0, 13, 1, 0xF, 0, 0xF, 1, 1, 0},
+    // [14..17] SID2 filter/volume
+    {FourCC::SIDInstrument2FilterCut, 0, 14, 1, 0x1FF, 0, 0x7FF, 1, 0x10, 0},
+    {FourCC::SIDInstrument2FilterResonance, 0, 15, 1, 0, 0, 0xF, 1, 1, 0},
+    {FourCC::SIDInstrument2FilterMode, 0, 16, 1, 0, 0, DFM_LAST - 1, 1, 1, 0},
+    {FourCC::SIDInstrument2Volume, 0, 17, 1, 0xF, 0, 0xF, 1, 1, 0},
+};
+
+const char *const SIDInstrument::NAMES[SIDInstrument::kParamCount] = {
+    /*  0 */ "InstrumentName",
+    /*  1 */ "SIDInstrumentPulseWidth",
+    /*  2 */ "SIDInstrumentWaveform",
+    /*  3 */ "SIDInstrumentVSync",
+    /*  4 */ "SIDInstrumentRingModulator",
+    /*  5 */ "SIDInstrumentADSR",
+    /*  6 */ "SIDInstrumentFilterOn",
+    /*  7 */ "SIDInstrumentTable",
+    /*  8 */ "SIDInstrumentTableAutomation",
+    /*  9 */ "SIDInstrumentOSCNumber",
+    /* 10 */ "SIDInstrument1FilterCut",
+    /* 11 */ "SIDInstrument1FilterResonance",
+    /* 12 */ "SIDInstrument1FilterMode",
+    /* 13 */ "SIDInstrument1Volume",
+    /* 14 */ "SIDInstrument2FilterCut",
+    /* 15 */ "SIDInstrument2FilterResonance",
+    /* 16 */ "SIDInstrument2FilterMode",
+    /* 17 */ "SIDInstrument2Volume",
+};
+
+// All persistence formats use plain decimal — keeps RestoreContent simple
+// (atoi) and round-trips with existing .pti files where values were stored
+// via Variable::GetString() ("%d"). Display-side formatting ("vpw: %4.4X")
+// is supplied by the UIParamIntVarField's own format string at the call
+// site, not via GetParamFormat.
+const char *const SIDInstrument::FORMATS[SIDInstrument::kParamCount] = {
+    "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d",
+    "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d",
+};
 
 SIDInstrument::SIDInstrument(SIDInstrumentInstance chip)
-    : I_Instrument(&variables_), chip_(chip),
-      vpw_(FourCC::SIDInstrumentPulseWidth, 0x800),
-      vwf_(FourCC::SIDInstrumentWaveform, sidWaveformText, DWF_LAST, 0x1),
-      vsync_(FourCC::SIDInstrumentVSync, false),
-      vring_(FourCC::SIDInstrumentRingModulator, false),
-      vadsr_(FourCC::SIDInstrumentADSR, 0x2282),
-      vfon_(FourCC::SIDInstrumentFilterOn, false),
-      table_(FourCC::SIDInstrumentTable, -1),
-      tableAuto_(FourCC::SIDInstrumentTableAutomation, false),
-      osc_(FourCC::SIDInstrumentOSCNumber, 0) {
+    : I_Instrument(nullptr), chip_(chip), fltcutIdx_(0), fltresIdx_(0),
+      fltmodeIdx_(0), volIdx_(0) {
 
-  // name_ is now an etl::string in the base class, not a Variable
-  variables_.insert(variables_.end(), &vpw_);
-  variables_.insert(variables_.end(), &vwf_);
-  variables_.insert(variables_.end(), &vsync_);
-  variables_.insert(variables_.end(), &vring_);
-  variables_.insert(variables_.end(), &vadsr_);
-  variables_.insert(variables_.end(), &vfon_);
-  variables_.insert(variables_.end(), &table_);
-  variables_.insert(variables_.end(), &tableAuto_);
-  variables_.insert(variables_.end(), &osc_);
-  variables_.insert(variables_.end(), &fltcut1_);
-  variables_.insert(variables_.end(), &fltres1_);
-  variables_.insert(variables_.end(), &fltmode1_);
-  variables_.insert(variables_.end(), &vol1_);
-
-  variables_.insert(variables_.end(), &fltcut2_);
-  variables_.insert(variables_.end(), &fltres2_);
-  variables_.insert(variables_.end(), &fltmode2_);
-  variables_.insert(variables_.end(), &vol2_);
+  // Initialise the packed array to each ParamSpec's default. We iterate
+  // SPECS[i].default_ in lieu of re-deriving from the Variable defaults.
+  for (int i = 0; i < kParamCount; i++) {
+    params_[i] = SPECS[i].default_;
+  }
+  // ParamSpec::default_ is unsigned; -1 wouldn't fit. Reapply the Table
+  // "unbound" sentinel (-1) explicitly here, matching the legacy Variable
+  // initialiser.
+  params_[PARAM_TABLE] = -1;
 }
 
 SIDInstrument::~SIDInstrument(){};
@@ -86,19 +131,19 @@ bool SIDInstrument::Init() {
 
   Trace::Debug("SID instrument chip is %i and osc is %i", chip_, GetOsc());
   switch (chip_) {
-  case 1:
+  case SID1:
     sid_ = &sid1_;
-    fltcut_ = &fltcut1_;
-    fltres_ = &fltres1_;
-    fltmode_ = &fltmode1_;
-    vol_ = &vol1_;
+    fltcutIdx_ = PARAM_FLTCUT_1;
+    fltresIdx_ = PARAM_FLTRES_1;
+    fltmodeIdx_ = PARAM_FLTMODE_1;
+    volIdx_ = PARAM_VOL_1;
     break;
-  case 2:
+  case SID2:
     sid_ = &sid2_;
-    fltcut_ = &fltcut2_;
-    fltres_ = &fltres2_;
-    fltmode_ = &fltmode2_;
-    vol_ = &vol2_;
+    fltcutIdx_ = PARAM_FLTCUT_2;
+    fltresIdx_ = PARAM_FLTRES_2;
+    fltmodeIdx_ = PARAM_FLTMODE_2;
+    volIdx_ = PARAM_VOL_2;
     break;
   default:
     return false;
@@ -166,30 +211,40 @@ bool SIDInstrument::Start(int c, unsigned char note, bool retrigger) {
     sid_->cRSID_resetChannel(osc);
   }
 
+  int vpw = params_[PARAM_VPW];
+  int vwf = params_[PARAM_VWF];
+  int vring = params_[PARAM_VRING];
+  int vsync = params_[PARAM_VSYNC];
+  int vadsr = params_[PARAM_VADSR];
+  int vfon = params_[PARAM_VFON];
+  int fltcut = params_[fltcutIdx_];
+  int fltres = params_[fltresIdx_];
+  int fltmode = params_[fltmodeIdx_];
+  int vol = params_[volIdx_];
+
   sid_->Register[0 + osc * 7] = sid_notes[note - 24] & 0xFF; // V1 Freq Lo
   sid_->Register[1 + osc * 7] = sid_notes[note - 24] >> 8;   // V1 Freq Hi
-  sid_->Register[2 + osc * 7] = vpw_.GetInt() & 0xFF;        // V1 PW Lo
-  sid_->Register[3 + osc * 7] = vpw_.GetInt() >> 8;          // V1 PW Hi
-  sid_->Register[4 + osc * 7] = vwf_.GetInt() << 4 | vring_.GetInt() << 2 |
-                                vsync_.GetInt() << 1 |
+  sid_->Register[2 + osc * 7] = vpw & 0xFF;                 // V1 PW Lo
+  sid_->Register[3 + osc * 7] = vpw >> 8;                   // V1 PW Hi
+  sid_->Register[4 + osc * 7] = vwf << 4 | vring << 2 | vsync << 1 |
                                 (int)gate_;             // V1 Control Reg
-  sid_->Register[5 + osc * 7] = vadsr_.GetInt() >> 8;   // V1 Attack/Decay
-  sid_->Register[6 + osc * 7] = vadsr_.GetInt() & 0xFF; // V1 Sustain/Release
+  sid_->Register[5 + osc * 7] = vadsr >> 8;             // V1 Attack/Decay
+  sid_->Register[6 + osc * 7] = vadsr & 0xFF;           // V1 Sustain/Release
 
   // filter settings
-  sid_->Register[21] = fltcut_->GetInt() & 0x7; // Filter Cut lo
-  sid_->Register[22] = fltcut_->GetInt() >> 3;  // Filter Cut Hi
+  sid_->Register[21] = fltcut & 0x7; // Filter Cut lo
+  sid_->Register[22] = fltcut >> 3;  // Filter Cut Hi
 
   // on start for each instrument it sets its own filter on bit in this register
   //  we need to clear filter resonance and the current oscillator's filter on
   //  bit while preserving the filter on bits of the other two oscillators for
   //  this chip
   sid_->Register[23] = (sid_->Register[23] & 0xF & ~(1 << osc)) |
-                       fltres_->GetInt() << 4 | // filter resonance
-                       vfon_.GetInt() << osc;   // filter on bit for this osc
+                       fltres << 4 |        // filter resonance
+                       vfon << osc;         // filter on bit for this osc
 
   int8_t mode = 0;
-  switch (fltmode_->GetInt()) {
+  switch (fltmode) {
   case DFM_LP:
     mode = 1;
     break;
@@ -205,15 +260,9 @@ bool SIDInstrument::Start(int c, unsigned char note, bool retrigger) {
   }
   // TODO: implement v3off
   //  sid_->Register[24] =
-  //      v3off_.GetInt() << 7 | mode << 4 | vol_->GetInt(); // Filter Mode/Vol
+  //      v3off_.GetInt() << 7 | mode << 4 | vol_.GetInt(); // Filter Mode/Vol
 
-  sid_->Register[24] = 0 << 7 | mode << 4 | vol_->GetInt(); // Filter Mode / Vol
-
-  //  for (int n = 0; n < 29; n++) {
-  //    printf("Register %i value: 0x%x (0b" BYTE_TO_BINARY_PATTERN ")",
-  //    n,
-  //           sid_->Register[n], BYTE_TO_BINARY(sid_->Register[n]));
-  //  }
+  sid_->Register[24] = 0 << 7 | mode << 4 | vol; // Filter Mode / Vol
 
   playing_ = true;
 
@@ -264,14 +313,10 @@ etl::string<MAX_INSTRUMENT_NAME_LENGTH> SIDInstrument::GetName() {
   return etl::string<MAX_INSTRUMENT_NAME_LENGTH>(InstrumentTypeNames[IT_SID]);
 }
 
-int SIDInstrument::GetTable() {
-  Variable *v = FindVariable(FourCC::SIDInstrumentTable);
-  return v->GetInt();
-};
+int SIDInstrument::GetTable() { return params_[PARAM_TABLE]; };
 
 bool SIDInstrument::GetTableAutomation() {
-  Variable *v = FindVariable(FourCC::SIDInstrumentTableAutomation);
-  return v->GetBool();
+  return params_[PARAM_TABLE_AUTO] != 0;
 };
 
 void SIDInstrument::GetTableState(TableSaveState &state) {
@@ -287,3 +332,109 @@ void SIDInstrument::SetTableState(TableSaveState &state) {
   memcpy(tableState_.position_, state.position_, sizeof(int) * 3);
   tableState_.groove_ = state.groove_;
 };
+
+// ---------------------------------------------------------------------------
+// Plan B: new parameter API overrides for the packed array.
+// ---------------------------------------------------------------------------
+
+FourCC SIDInstrument::GetParamID(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return FourCC::Default;
+  }
+  return SPECS[idx].id;
+}
+
+const char *SIDInstrument::GetParamName(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return "";
+  }
+  return NAMES[idx];
+}
+
+const char *SIDInstrument::GetParamFormat(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return "%d";
+  }
+  return FORMATS[idx];
+}
+
+int SIDInstrument::GetParamMin(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 0;
+  }
+  return SPECS[idx].min;
+}
+
+int SIDInstrument::GetParamMax(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 0xFFFF;
+  }
+  return SPECS[idx].max;
+}
+
+int SIDInstrument::GetParamDefault(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 0;
+  }
+  return (int)SPECS[idx].default_;
+}
+
+int SIDInstrument::GetParamStep(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 1;
+  }
+  return SPECS[idx].step;
+}
+
+int SIDInstrument::GetParamBigStep(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 1;
+  }
+  return SPECS[idx].big_step;
+}
+
+void SIDInstrument::SetParamValue(int idx, int v) {
+  if (idx < 0 || idx >= kParamCount) {
+    return;
+  }
+  if (idx == PARAM_NAME) {
+    // Name is stored in name_, not in the packed array — callers should
+    // use SetName(...) for the name slot. Keep the parameter API
+    // symmetric, but ignore attempts to write the name as an int here.
+    return;
+  }
+  // Clamp to [min, max] so direct API writes don't store out-of-range
+  // values that the UI would also reject.
+  if (v < (int)SPECS[idx].min) {
+    v = SPECS[idx].min;
+  } else if (v > (int)SPECS[idx].max) {
+    v = SPECS[idx].max;
+  }
+  if (params_[idx] == v) {
+    return;
+  }
+  params_[idx] = v;
+  SetChanged();
+  NotifyObservers();
+}
+
+bool SIDInstrument::IsParamModified(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return false;
+  }
+  return params_[idx] != (int)SPECS[idx].default_;
+}
+
+void SIDInstrument::ResetParam(int idx) {
+  if (idx < 0 || idx >= kParamCount || idx == PARAM_NAME) {
+    return;
+  }
+  params_[idx] = SPECS[idx].default_;
+}
+
+void SIDInstrument::ResetAllParams() {
+  for (int i = 1; i < kParamCount; i++) { // skip name slot at idx 0
+    params_[i] = SPECS[i].default_;
+  }
+  params_[PARAM_TABLE] = -1; // restore legacy default
+}

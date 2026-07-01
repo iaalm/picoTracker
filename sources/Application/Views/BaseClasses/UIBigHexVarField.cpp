@@ -13,7 +13,7 @@
 #include <System/Console/nanoprintf.h>
 #include <string.h>
 
-UIBigHexVarField::UIBigHexVarField(const GUIPoint &position, Variable &v,
+UIBigHexVarField::UIBigHexVarField(const GUIPoint &position, Variable *v,
                                    int precision, const char *format, int min,
                                    int max, int power, bool wrap)
     : UIIntVarField(position, v, format, min, max, 0, 0) {
@@ -30,7 +30,7 @@ void UIBigHexVarField::Draw(GUIWindow &w, int offset) {
   position._y += offset;
 
   char buffer[MAX_FIELD_WIDTH + 1];
-  int value = src_.GetInt();
+  int value = ReadInt();
   npf_snprintf(buffer, sizeof(buffer), format_, value);
 
   if (focus_) {
@@ -59,7 +59,7 @@ void UIBigHexVarField::Draw(GUIWindow &w, int offset) {
 
 void UIBigHexVarField::ProcessArrow(unsigned short mask) {
 
-  int value = src_.GetInt();
+  int value = ReadInt();
   int offset = 1;
   for (unsigned int i = 0; i < position_; i++) {
     offset *= power_;
@@ -90,9 +90,9 @@ void UIBigHexVarField::ProcessArrow(unsigned short mask) {
   if (value < min_) {
     value = (wrap_) ? max_ + (value - min_) + 1 : min_;
   };
-  src_.SetInt(value);
+  WriteInt(value);
 
   SetChanged();
   NotifyObservers(reinterpret_cast<I_ObservableData *>(
-      static_cast<uintptr_t>(src_.GetID())));
+      static_cast<uintptr_t>(GetVariableID())));
 };

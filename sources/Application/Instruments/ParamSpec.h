@@ -1,0 +1,47 @@
+/*
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
+ * Copyright (c) 2026 xiphonics, inc.
+ *
+ * This file is part of the picoTracker firmware
+ */
+
+#ifndef _PARAM_SPEC_H_
+#define _PARAM_SPEC_H_
+
+#include <cstdint>
+#include "Foundation/Types/Types.h" // for FourCC
+
+// ---------------------------------------------------------------------------
+// ParamSpec — static metadata for one instrument parameter (Plan B,
+// docs/instrument-param-api.md §4).
+//
+// Lives in flash on RP2040 (`static const`). The table is the only source of
+// per-parameter metadata — no runtime allocation, no virtual calls. Each
+// instrument class provides one ParamSpec per UI parameter (including the
+// reserved name slot at idx 0).
+//
+// Field types are widened from the design-doc's `uint8_t` because SID/Synth
+// parameters reach 0xFFFF — `uint8_t` cannot represent -1 (Table default) or
+// 16-bit max values. The on-flash cost rises from 12 to 16 bytes per spec,
+// still negligible (≈ 560 B for 35 Synth params).
+//
+// The NAMES and FORMATS tables are indexed via name_off / format_off (offsets
+// into per-class arrays of `const char *`). Lookup is
+// `NAMES[SPECS[i].name_off]`.
+// ---------------------------------------------------------------------------
+struct ParamSpec {
+  FourCC  id;          // 1 B (1 byte pad follows for alignment)
+  uint8_t _pad0;       // 1 B
+  uint16_t name_off;   // 2 B offset into per-class name string table
+  uint16_t format_off; // 2 B offset into per-class format string table
+  int16_t  default_;   // 2 B (signed to allow Table's -1 unbound sentinel)
+  uint16_t min;        // 2 B
+  uint16_t max;        // 2 B
+  uint8_t  step;       // 1 B
+  uint8_t  big_step;   // 1 B
+  uint8_t  _pad1;      // 1 B (alignment / future flags)
+};
+static_assert(sizeof(ParamSpec) == 16, "ParamSpec must be 16 B");
+
+#endif

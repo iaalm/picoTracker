@@ -6,6 +6,10 @@ add_library(application_views_baseclasses
   UIField.cpp
   UIIntField.cpp
   UIIntVarField.cpp
+  UIParamBigHexVarField.cpp
+  UIParamBitmaskVarField.cpp
+  UIParamIntVarField.cpp
+  UIParamIntVarOffField.cpp
   UIIntVarOffField.cpp
   UINoteVarField.cpp
   UISortedVarList.cpp
