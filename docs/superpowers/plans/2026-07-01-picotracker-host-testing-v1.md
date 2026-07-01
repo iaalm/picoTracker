@@ -306,9 +306,9 @@ TEST_CASE("R1: SaveToBuffer + LoadFromBuffer round-trip") {
 
   // First call: no sub-services are registered in a host test, so
   // SaveToBuffer should still emit the root <PICOTRACKER> element and
-  // return a non-zero written length.
-  Status s = svc.SaveToBuffer(buf, sizeof(buf), written);
-  CHECK(s.ok());
+  // return true with a non-zero written length.
+  bool ok = svc.SaveToBuffer(buf, sizeof(buf), written);
+  CHECK(ok == true);
   CHECK(written > 0);
 
   // Now load the same buffer back; the document should accept it.
@@ -317,12 +317,19 @@ TEST_CASE("R1: SaveToBuffer + LoadFromBuffer round-trip") {
 }
 ```
 
+> **Spec note (plan fix during pre-flight):** `Status` is a class with static
+> `Set()` methods, not an enum (see `sources/System/io/Status.h`). The
+> codebase's success/failure conventions are `bool` (e.g. `PersistencyDocument::Load`)
+> and `PersistencyResult` (e.g. `PersistencyService::Load`). `SaveToBuffer`
+> returns `bool` to match `LoadFromBuffer`'s `bool` return — symmetric and
+> requires no new enum.
+
 **Step 4.2: Run — expect compile failure**
 
 ```bash
 cmake --build build-host --target picoTracker_persist -j 4 2>&1 | tail -5
 ```
-Expected: `SaveToBuffer` and `Status::ok()` not found. (Status enum exists at `System/io/Status.h`; if `ok()` accessor is missing, the plan adjusts to `CHECK(s == Status::OK)` based on the enum's actual shape — fix inline.)
+Expected: `SaveToBuffer` not found on `PersistencyService`. This is the red.
 
 **Step 4.3: Commit (test-only)**
 
@@ -343,7 +350,7 @@ git commit -m "tests: add R1 (round-trip) failing test"
 
 Add to `PersistencyService.h`, in `public:`:
 ```cpp
-  Status SaveToBuffer(uint8_t *data, size_t cap, size_t &written);
+  bool SaveToBuffer(uint8_t *data, size_t cap, size_t &written);
 ```
 
 **Step 5.2: Implement in `.cpp`**
@@ -352,15 +359,15 @@ Add at the end of `PersistencyService.cpp`:
 ```cpp
 #include <Externals/TinyXML2/tinyxml2.h>
 
-Status PersistencyService::SaveToBuffer(uint8_t *data, size_t cap,
-                                        size_t &written) {
+bool PersistencyService::SaveToBuffer(uint8_t *data, size_t cap,
+                                     size_t &written) {
   written = 0;
   if (!data || cap == 0) {
     Trace::Error("PERSISTENCYSERVICE: SaveToBuffer called with empty target");
-    return Status::ERROR;
+    return false;
   }
 
-  tinyxml2::XMLPrinter printer(nullptr, false);  // internal buffer
+  tinyxml2::XMLPrinter printer;  // internal buffer (no FILE*)
   printer.OpenElement("PICOTRACKER");
 
   // Drive the same Persistent::Save loop that SaveProjectData uses,
@@ -374,17 +381,17 @@ Status PersistencyService::SaveToBuffer(uint8_t *data, size_t cap,
   const char *xml = printer.CStr();
   if (!xml) {
     Trace::Error("PERSISTENCYSERVICE: XMLPrinter produced no output");
-    return Status::ERROR;
+    return false;
   }
   size_t len = strlen(xml);
   if (len + 1 > cap) {
     Trace::Error("PERSISTENCYSERVICE: SaveToBuffer cap %zu < needed %zu",
                  cap, len + 1);
-    return Status::ERROR;
+    return false;
   }
   memcpy(data, xml, len + 1);  // include trailing NUL for symmetry
   written = len;
-  return Status::OK;
+  return true;
 }
 ```
 
