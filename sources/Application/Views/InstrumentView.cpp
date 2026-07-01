@@ -643,21 +643,22 @@ void InstrumentView::fillOpalParameters() {
   fieldList_.insert(fieldList_.end(), &(*staticField_.rbegin()));
 
   position._y += 2;
-  Variable *v = instrument->FindVariable(FourCC::OPALInstrumentAlgorithm);
-  intVarField_.emplace_back(position, *v, "Algorithm:     %s", 0, 1, 1, 1);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, OpalInstrument::PARAM_ALGORITHM,
+      "Algorithm:     %s", 0, 1, 1, 1));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::OPALInstrumentDeepTremeloVibrato);
-  bitmaskVarField_.emplace_back(
-      UIBitmaskVarField(position, *v, "Deep Trem/Vib: %02b", 2));
-  fieldList_.insert(fieldList_.end(), &(*bitmaskVarField_.rbegin()));
+  paramBitmaskVarField_.emplace_back(UIParamBitmaskVarField(
+      position, instrument, OpalInstrument::PARAM_DEEP_TREM_VIB,
+      "Deep Trem/Vib: %02b", 2));
+  fieldList_.insert(fieldList_.end(), &(*paramBitmaskVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::OPALInstrumentFeedback);
-  intVarField_.emplace_back(
-      UIIntVarField(position, *v, "Feedback:      %1.1X", 0, 0x07, 1, 1, 0));
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, OpalInstrument::PARAM_FEEDBACK,
+      "Feedback:      %1.1X", 0, 0x07, 1, 1, 0));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 2;
   staticField_.emplace_back(position, "Operator Settings" char_line_7_s);
@@ -684,70 +685,70 @@ void InstrumentView::fillOpalParameters() {
   }
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::OPALInstrumentOp1Level);
-  intVarField_.emplace_back(
-      UIIntVarField(position, *v, "Level:         %2.2X", 0, 63, 1, 1, 0));
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, OpalInstrument::PARAM_OP1_LEVEL,
+      "Level:         %2.2X", 0, 63, 1, 1, 0));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
-  v = instrument->FindVariable(FourCC::OPALInstrumentOp2Level);
-  intVarField_.emplace_back(
-      UIIntVarField(position + GUIPoint(20, 0), *v, "%2.2X", 0, 63, 1, 1, 0));
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
-
-  position._y += 1;
-  v = instrument->FindVariable(FourCC::OPALInstrumentOp1Multiplier);
-  intVarField_.emplace_back(
-      UIIntVarField(position, *v, "Multiplier:    %1.1X", 0, 15, 1, 1, 0));
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
-
-  v = instrument->FindVariable(FourCC::OPALInstrumentOp2Multiplier);
-  intVarField_.emplace_back(
-      UIIntVarField(position + GUIPoint(20, 0), *v, "%1.1X", 0, 15, 1, 1, 0));
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position + GUIPoint(20, 0), instrument, OpalInstrument::PARAM_OP2_LEVEL,
+      "%2.2X", 0, 63, 1, 1, 0));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::OPALInstrumentOp1ADSR);
-  bigHexVarField_.emplace_back(UIBigHexVarField(
-      position, *v, 4, "A/D/S/R:       %4.4X", 0, 0xFFFF, 16, true));
-  fieldList_.insert(fieldList_.end(), &(*bigHexVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, OpalInstrument::PARAM_OP1_MULTIPLIER,
+      "Multiplier:    %1.1X", 0, 15, 1, 1, 0));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
-  v = instrument->FindVariable(FourCC::OPALInstrumentOp2ADSR);
-  bigHexVarField_.emplace_back(UIBigHexVarField(
-      position + GUIPoint(20, 0), *v, 4, "%4.4X", 0, 0xFFFF, 16, true));
-  fieldList_.insert(fieldList_.end(), &(*bigHexVarField_.rbegin()));
-
-  position._y += 1;
-  v = instrument->FindVariable(FourCC::OPALInstrumentOp1WaveShape);
-  intVarField_.emplace_back(
-      UIIntVarField(position, *v, "Shape:         %s", 0, 7, 1, 1));
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
-
-  v = instrument->FindVariable(FourCC::OPALInstrumentOp2WaveShape);
-  intVarField_.emplace_back(
-      UIIntVarField(position + GUIPoint(20, 0), *v, "%s", 0, 7, 1, 1));
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position + GUIPoint(20, 0), instrument,
+      OpalInstrument::PARAM_OP2_MULTIPLIER, "%1.1X", 0, 15, 1, 1, 0));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::OPALInstrumentOp1TremVibSusKSR);
-  bitmaskVarField_.emplace_back(
-      UIBitmaskVarField(position, *v, "TR/VB/SU/KSR:  %04b", 4));
-  fieldList_.insert(fieldList_.end(), &(*bitmaskVarField_.rbegin()));
+  paramBigHexVarField_.emplace_back(UIParamBigHexVarField(
+      position, instrument, OpalInstrument::PARAM_OP1_ADSR, 4,
+      "A/D/S/R:       %4.4X", 0, 0xFFFF, 16, true));
+  fieldList_.insert(fieldList_.end(), &(*paramBigHexVarField_.rbegin()));
 
-  v = instrument->FindVariable(FourCC::OPALInstrumentOp2TremVibSusKSR);
-  bitmaskVarField_.emplace_back(
-      UIBitmaskVarField(position + GUIPoint(20, 0), *v, "%04b", 4));
-  fieldList_.insert(fieldList_.end(), &(*bitmaskVarField_.rbegin()));
+  paramBigHexVarField_.emplace_back(UIParamBigHexVarField(
+      position + GUIPoint(20, 0), instrument, OpalInstrument::PARAM_OP2_ADSR,
+      4, "%4.4X", 0, 0xFFFF, 16, true));
+  fieldList_.insert(fieldList_.end(), &(*paramBigHexVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::OPALInstrumentOp1KeyScaleLevel);
-  intVarField_.emplace_back(
-      UIIntVarField(position, *v, "Keyscale:      %s", 0, 3, 1, 1));
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, OpalInstrument::PARAM_OP1_WAVESHAPE,
+      "Shape:         %s", 0, 7, 1, 1));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
-  v = instrument->FindVariable(FourCC::OPALInstrumentOp2KeyScaleLevel);
-  intVarField_.emplace_back(
-      UIIntVarField(position + GUIPoint(20, 0), *v, "%s", 0, 3, 1, 1));
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position + GUIPoint(20, 0), instrument,
+      OpalInstrument::PARAM_OP2_WAVESHAPE, "%s", 0, 7, 1, 1));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
+
+  position._y += 1;
+  paramBitmaskVarField_.emplace_back(UIParamBitmaskVarField(
+      position, instrument, OpalInstrument::PARAM_OP1_TREM_VIB_SUS_KSR,
+      "TR/VB/SU/KSR:  %04b", 4));
+  fieldList_.insert(fieldList_.end(), &(*paramBitmaskVarField_.rbegin()));
+
+  paramBitmaskVarField_.emplace_back(UIParamBitmaskVarField(
+      position + GUIPoint(20, 0), instrument,
+      OpalInstrument::PARAM_OP2_TREM_VIB_SUS_KSR, "%04b", 4));
+  fieldList_.insert(fieldList_.end(), &(*paramBitmaskVarField_.rbegin()));
+
+  position._y += 1;
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, OpalInstrument::PARAM_OP1_KEYSCALE,
+      "Keyscale:      %s", 0, 3, 1, 1));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
+
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position + GUIPoint(20, 0), instrument, OpalInstrument::PARAM_OP2_KEYSCALE,
+      "%s", 0, 3, 1, 1));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   Trace::Error("OPAL fill done, total fields: %d", fieldList_.size());
 };

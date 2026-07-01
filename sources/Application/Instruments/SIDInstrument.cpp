@@ -44,38 +44,39 @@ SIDInstrument *SIDInstrument::SID2RenderMaster = 0;
 
 // ParamSpec positional layout (matches ParamSpec.h):
 //   id (FourCC), _pad0 (u8), name_off (u16), format_off (u16),
-//   default_ (i16), min (u16), max (u16), step (u8), big_step (u8), _pad1 (u8)
+//   default_ (i32), min (u16), max (u16), step (u8), big_step (u8),
+//   _pad1 (u8), _pad2 (u8)
 const ParamSpec SIDInstrument::SPECS[SIDInstrument::kParamCount] = {
     // [0] reserved name slot
-    {FourCC::InstrumentName, 0, 0, 0, 0, 0, 0, 1, 1, 0},
+    {FourCC::InstrumentName, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0},
     // [1] PulseWidth
-    {FourCC::SIDInstrumentPulseWidth, 0, 1, 1, 0x800, 0, 0xFFF, 1, 0x10, 0},
+    {FourCC::SIDInstrumentPulseWidth, 0, 1, 1, 0x800, 0, 0xFFF, 1, 0x10, 0, 0},
     // [2] Waveform (CHAR_LIST)
-    {FourCC::SIDInstrumentWaveform, 0, 2, 1, 0x1, 0, DWF_LAST - 1, 1, 1, 0},
+    {FourCC::SIDInstrumentWaveform, 0, 2, 1, 0x1, 0, DWF_LAST - 1, 1, 1, 0, 0},
     // [3] VSync (bool)
-    {FourCC::SIDInstrumentVSync, 0, 3, 1, 0, 0, 1, 1, 1, 0},
+    {FourCC::SIDInstrumentVSync, 0, 3, 1, 0, 0, 1, 1, 1, 0, 0},
     // [4] RingModulator (bool)
-    {FourCC::SIDInstrumentRingModulator, 0, 4, 1, 0, 0, 1, 1, 1, 0},
+    {FourCC::SIDInstrumentRingModulator, 0, 4, 1, 0, 0, 1, 1, 1, 0, 0},
     // [5] ADSR
-    {FourCC::SIDInstrumentADSR, 0, 5, 1, 0x2282, 0, 0xFFFF, 1, 0x10, 0},
+    {FourCC::SIDInstrumentADSR, 0, 5, 1, 0x2282, 0, 0xFFFF, 1, 0x10, 0, 0},
     // [6] FilterOn (bool)
-    {FourCC::SIDInstrumentFilterOn, 0, 6, 1, 0, 0, 1, 1, 1, 0},
+    {FourCC::SIDInstrumentFilterOn, 0, 6, 1, 0, 0, 1, 1, 1, 0, 0},
     // [7] Table (default -1 == "no table bound")
-    {FourCC::SIDInstrumentTable, 0, 7, 1, -1, 0, 0x7F, 1, 0x10, 0},
+    {FourCC::SIDInstrumentTable, 0, 7, 1, -1, 0, 0x7F, 1, 0x10, 0, 0},
     // [8] TableAutomation (bool)
-    {FourCC::SIDInstrumentTableAutomation, 0, 8, 1, 0, 0, 1, 1, 1, 0},
+    {FourCC::SIDInstrumentTableAutomation, 0, 8, 1, 0, 0, 1, 1, 1, 0, 0},
     // [9] OSCNumber
-    {FourCC::SIDInstrumentOSCNumber, 0, 9, 1, 0, 0, 2, 1, 1, 0},
+    {FourCC::SIDInstrumentOSCNumber, 0, 9, 1, 0, 0, 2, 1, 1, 0, 0},
     // [10..13] SID1 filter/volume
-    {FourCC::SIDInstrument1FilterCut, 0, 10, 1, 0x1FF, 0, 0x7FF, 1, 0x10, 0},
-    {FourCC::SIDInstrument1FilterResonance, 0, 11, 1, 0, 0, 0xF, 1, 1, 0},
-    {FourCC::SIDInstrument1FilterMode, 0, 12, 1, 0, 0, DFM_LAST - 1, 1, 1, 0},
-    {FourCC::SIDInstrument1Volume, 0, 13, 1, 0xF, 0, 0xF, 1, 1, 0},
+    {FourCC::SIDInstrument1FilterCut, 0, 10, 1, 0x1FF, 0, 0x7FF, 1, 0x10, 0, 0},
+    {FourCC::SIDInstrument1FilterResonance, 0, 11, 1, 0, 0, 0xF, 1, 1, 0, 0},
+    {FourCC::SIDInstrument1FilterMode, 0, 12, 1, 0, 0, DFM_LAST - 1, 1, 1, 0, 0},
+    {FourCC::SIDInstrument1Volume, 0, 13, 1, 0xF, 0, 0xF, 1, 1, 0, 0},
     // [14..17] SID2 filter/volume
-    {FourCC::SIDInstrument2FilterCut, 0, 14, 1, 0x1FF, 0, 0x7FF, 1, 0x10, 0},
-    {FourCC::SIDInstrument2FilterResonance, 0, 15, 1, 0, 0, 0xF, 1, 1, 0},
-    {FourCC::SIDInstrument2FilterMode, 0, 16, 1, 0, 0, DFM_LAST - 1, 1, 1, 0},
-    {FourCC::SIDInstrument2Volume, 0, 17, 1, 0xF, 0, 0xF, 1, 1, 0},
+    {FourCC::SIDInstrument2FilterCut, 0, 14, 1, 0x1FF, 0, 0x7FF, 1, 0x10, 0, 0},
+    {FourCC::SIDInstrument2FilterResonance, 0, 15, 1, 0, 0, 0xF, 1, 1, 0, 0},
+    {FourCC::SIDInstrument2FilterMode, 0, 16, 1, 0, 0, DFM_LAST - 1, 1, 1, 0, 0},
+    {FourCC::SIDInstrument2Volume, 0, 17, 1, 0xF, 0, 0xF, 1, 1, 0, 0},
 };
 
 const char *const SIDInstrument::NAMES[SIDInstrument::kParamCount] = {

@@ -35,13 +35,15 @@ struct ParamSpec {
   uint8_t _pad0;       // 1 B
   uint16_t name_off;   // 2 B offset into per-class name string table
   uint16_t format_off; // 2 B offset into per-class format string table
-  int16_t  default_;   // 2 B (signed to allow Table's -1 unbound sentinel)
+  int32_t  default_;   // 4 B (signed: -1 Table unbound, 0xF1C8 OPAL ADSR,
+                       //            0xFFFF Synth LFODelay all fit comfortably)
   uint16_t min;        // 2 B
   uint16_t max;        // 2 B
   uint8_t  step;       // 1 B
   uint8_t  big_step;   // 1 B
   uint8_t  _pad1;      // 1 B (alignment / future flags)
+  uint8_t _pad2;       // 1 B (round struct to 4-byte alignment for default_)
 };
-static_assert(sizeof(ParamSpec) == 16, "ParamSpec must be 16 B");
+static_assert(sizeof(ParamSpec) == 20, "ParamSpec must be 20 B");
 
 #endif
