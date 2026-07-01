@@ -1534,10 +1534,11 @@ void SampleInstrument::SaveContent(tinyxml2::XMLPrinter *printer) {
   // (sample name as a string), then append slice-point entries.
   I_Instrument::SaveContent(printer);
 
-  // SampleInstrumentSample: write as a separate PARAM (legacy field,
-  // round-trips through the existing parser).
+  // SampleInstrumentSample: write as a separate PARAM with the legacy
+  // FourCC c_str NAME ("sample") so files saved with the new code stay
+  // byte-compatible with the pre-stage-4 format.
   printer->OpenElement("PARAM");
-  printer->PushAttribute("NAME", "SampleInstrumentSample");
+  printer->PushAttribute("NAME", "sample");
   printer->PushAttribute("VALUE", sample_.GetString().c_str());
   printer->CloseElement();
 
@@ -1597,9 +1598,11 @@ void SampleInstrument::RestoreContent(PersistencyDocument *doc) {
         SetName(value.c_str());
       } else if (!strncasecmp(name.c_str(), "SL", 2)) {
         setSliceFromString(name.c_str() + 2, value.c_str());
-      } else if (!strcasecmp(name.c_str(), "SampleInstrumentSample")) {
-        // Legacy sample-selection field — keep the existing Variable path
-        // so the sample-pool name lookup continues to work.
+      } else if (!strcasecmp(name.c_str(), "sample")) {
+        // Legacy sample-selection field — the pre-stage-4 .pti files saved
+        // the FourCC c_str ("sample") as the NAME attribute, not the
+        // C++-identifier name. Keep the existing Variable path so the
+        // sample-pool name lookup continues to work for legacy projects.
         sample_.SetString(value.c_str());
       } else {
         // 18 packed parameters: look up by name via the new API.
