@@ -427,6 +427,25 @@ exercises the read/write names directly, which is where the bug lived.
 
 **Step 6.1: Write the test**
 
+> **Hand-off from Task 1 (per Important finding #4 of Task 1 review):**
+> Task 1's scaffold introduced `tests/stubs/MinimalStubs.h/.cpp` — a host-only
+> stand-in for `Variable`/`VariableContainer`/`Observable`/`I_Instrument`,
+> added because the real `I_Instrument.cpp` + instrument headers fail to compile
+> on host. Root cause: `ParamSpec.h:47` `static_assert(sizeof(ParamSpec) == 20)`
+> depends on `FourCC` being 1 byte (RP2040 char-sized); on host, ETL's enum
+> macros make `FourCC` a different size and the assert fires.
+>
+> **Recommended fix at Task 6 start:** relax `ParamSpec.h`'s `static_assert`
+> under `HOST_TEST` (e.g. `#ifndef HOST_TEST static_assert(sizeof(ParamSpec) == 20); #endif`),
+> then replace `tests/stubs/MinimalStubs.h/.cpp` with the real
+> `I_Instrument.cpp` in the `picoTracker_persist` target's source list.
+> Re-run Task 1's smoke test as a regression check.
+>
+> **Fallback if FourCC ABI cannot be reconciled:** test NAMES via the per-class
+> static `SPECS`/`NAMES` arrays directly (e.g. `SynthInstrument::NAMES[i]`)
+> without instantiating instruments. This catches the 9a1315c bug class
+> (mismatched strings) without needing the runtime types.
+
 Append to `tests/persist_tests.cpp`:
 ```cpp
 #include "Application/Instruments/I_Instrument.h"

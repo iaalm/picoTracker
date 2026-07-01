@@ -67,5 +67,5 @@ target_include_directories(picoTracker_persist PRIVATE ${HOST_TEST_INCLUDES})
 target_compile_definitions(picoTracker_persist PRIVATE
   HOST_TEST
   NDEBUG
-  TEST_FIXTURE_PATH="${CMAKE_CURRENT_LIST_DIR}/test_root/projects/lgpt_CTX2/lgptsav.dat"
+  TEST_FIXTURE_PATH="${CMAKE_CURRENT_LIST_DIR}/../test_root/projects/lgpt_CTX2"
 )
