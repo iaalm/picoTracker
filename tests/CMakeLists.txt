@@ -40,3 +40,32 @@ target_include_directories(synth_render PRIVATE ${HOST_TEST_INCLUDES})
 target_compile_definitions(synth_render PRIVATE
   HOST_TEST
 )
+
+add_executable(picoTracker_persist
+  test_main.cpp
+  persist_tests.cpp
+  stubs/MinimalStubs.cpp
+  ../sources/Application/Persistency/PersistencyDocument.cpp
+  ../sources/Application/Persistency/PersistencyService.cpp
+  ../sources/Application/Persistency/Persistent.cpp
+  ../sources/Foundation/Services/Service.cpp
+  ../sources/Foundation/Services/SubService.cpp
+  ../sources/Foundation/Services/ServiceRegistry.cpp
+  ../sources/Foundation/Observable.cpp
+  ../sources/Foundation/Variables/VariableContainer.cpp
+  ../sources/Foundation/Variables/Variable.cpp
+  ../sources/System/Console/Trace.cpp
+  ../sources/System/Console/n_assert.cpp
+  ../sources/Externals/yxml/yxml.c
+  ../sources/Externals/TinyXML2/tinyxml2_printer_only.cpp
+  ../sources/Externals/TinyXML2/tinyxml2adapter.cpp
+  ../sources/Application/Utils/char.cpp
+)
+
+target_include_directories(picoTracker_persist PRIVATE ${HOST_TEST_INCLUDES})
+
+target_compile_definitions(picoTracker_persist PRIVATE
+  HOST_TEST
+  NDEBUG
+  TEST_FIXTURE_PATH="${CMAKE_CURRENT_LIST_DIR}/test_root/projects/lgpt_CTX2/lgptsav.dat"
+)
