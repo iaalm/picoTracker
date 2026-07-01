@@ -21,14 +21,50 @@ MidiService *MidiInstrument::svc_ = 0;
 TimerService *MidiInstrument::timerSvc_ = 0;
 MidiInstrument::NoteOffInfo MidiInstrument::NoteOffInfo::current = {0, 0};
 
-MidiInstrument::MidiInstrument()
-    : I_Instrument(&variables_), channel_(FourCC::MidiInstrumentChannel, 0),
-      noteLen_(FourCC::MidiInstrumentNoteLength, 0),
-      volume_(FourCC::MidiInstrumentVolume, 255),
-      table_(FourCC::MidiInstrumentTable, VAR_OFF),
-      tableAuto_(FourCC::MidiInstrumentTableAutomation, false),
-      program_(FourCC::MidiInstrumentProgram, VAR_OFF) {
+// ---------------------------------------------------------------------------
+// Plan B: static ParamSpec / NAMES / FORMATS tables for MidiInstrument.
+// ---------------------------------------------------------------------------
 
+// ParamSpec positional layout (matches ParamSpec.h):
+//   id (FourCC), _pad0 (u8), name_off (u16), format_off (u16),
+//   default_ (i32), min (u16), max (u16), step (u8), big_step (u8),
+//   _pad1 (u8), _pad2 (u8)
+const ParamSpec MidiInstrument::SPECS[MidiInstrument::kParamCount] = {
+    // [0] reserved name slot
+    {FourCC::InstrumentName, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0},
+    // [1] Channel
+    {FourCC::MidiInstrumentChannel, 0, 1, 1, 0, 0, 0x0F, 1, 0x04, 0, 0},
+    // [2] NoteLength
+    {FourCC::MidiInstrumentNoteLength, 0, 2, 1, 0, 0, 0xFF, 1, 0x10, 0, 0},
+    // [3] Volume
+    {FourCC::MidiInstrumentVolume, 0, 3, 1, 255, 0, 0xFF, 1, 0x10, 0, 0},
+    // [4] Table (default VAR_OFF == -1)
+    {FourCC::MidiInstrumentTable, 0, 4, 1, -1, -1, 0x7F, 1, 0x10, 0, 0},
+    // [5] TableAutomation (bool)
+    {FourCC::MidiInstrumentTableAutomation, 0, 5, 1, 0, 0, 1, 1, 1, 0, 0},
+    // [6] Program (default VAR_OFF == -1)
+    {FourCC::MidiInstrumentProgram, 0, 6, 1, -1, -1, 0x7F, 1, 0x10, 0, 0},
+    // [7] reserved / unused — kept to align with the legacy 7-slot
+    // Variables() count. Round-trip safety only.
+    {FourCC::Default, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0},
+};
+
+const char *const MidiInstrument::NAMES[MidiInstrument::kParamCount] = {
+    /*  0 */ "InstrumentName",
+    /*  1 */ "MidiInstrumentChannel",
+    /*  2 */ "MidiInstrumentNoteLength",
+    /*  3 */ "MidiInstrumentVolume",
+    /*  4 */ "MidiInstrumentTable",
+    /*  5 */ "MidiInstrumentTableAutomation",
+    /*  6 */ "MidiInstrumentProgram",
+    /*  7 */ "MidiInstrumentUnused",
+};
+
+const char *const MidiInstrument::FORMATS[MidiInstrument::kParamCount] = {
+    "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d",
+};
+
+MidiInstrument::MidiInstrument() : I_Instrument(nullptr) {
   if (svc_ == 0) {
     svc_ = MidiService::GetInstance();
   };
@@ -37,13 +73,10 @@ MidiInstrument::MidiInstrument()
     timerSvc_ = TimerService::GetInstance();
   };
 
-  // name_ is now an etl::string in the base class, not a Variable
-  variables_.insert(variables_.end(), &channel_);
-  variables_.insert(variables_.end(), &noteLen_);
-  variables_.insert(variables_.end(), &volume_);
-  variables_.insert(variables_.end(), &table_);
-  variables_.insert(variables_.end(), &tableAuto_);
-  variables_.insert(variables_.end(), &program_);
+  // Initialise the packed array to each ParamSpec's default.
+  for (int i = 0; i < kParamCount; i++) {
+    params_[i] = SPECS[i].default_;
+  }
 }
 
 MidiInstrument::~MidiInstrument(){};
@@ -57,25 +90,25 @@ void MidiInstrument::OnStart() {
   tableState_.Reset();
 
   // Send program change message at the start of playback
-  int program = program_.GetInt();
+  int program = params_[PARAM_PROGRAM];
 
   // Only send program change if a valid program is set
   // 0x80 is used to indicate "OFF"
   if (program != VAR_OFF && program >= 0 && program <= 0x7F) {
-    SendProgramChange(channel_.GetInt(), program);
+    SendProgramChange(params_[PARAM_CHANNEL], program);
   }
 
   MidiMessage msg;
   // send instrument volume for this midi channel when it's not zero
-  int volume = volume_.GetInt();
+  int volume = params_[PARAM_VOLUME];
   if (volume > 0) {
-    msg.status_ = MidiMessage::MIDI_CONTROL_CHANGE + channel_.GetInt();
+    msg.status_ = MidiMessage::MIDI_CONTROL_CHANGE + params_[PARAM_CHANNEL];
     msg.data1_ = MidiCC::CC_VOLUME;
     msg.data2_ = volume / 2;
     svc_->QueueMessage(msg);
   }
 
-  svc_->RegisterActiveChannel(channel_.GetInt());
+  svc_->RegisterActiveChannel(params_[PARAM_CHANNEL]);
 };
 
 bool MidiInstrument::Start(int c, unsigned char note, bool retrigger) {
@@ -83,11 +116,8 @@ bool MidiInstrument::Start(int c, unsigned char note, bool retrigger) {
   first_[c] = true;
   lastNotes_[c][0] = note;
 
-  Variable *v = FindVariable(FourCC::MidiInstrumentChannel);
-  int channel = v->GetInt();
-
-  v = FindVariable(FourCC::MidiInstrumentNoteLength);
-  remainingTicks_ = v->GetInt();
+  int channel = params_[PARAM_CHANNEL];
+  remainingTicks_ = params_[PARAM_NOTE_LENGTH];
   if (remainingTicks_ == 0) {
     remainingTicks_ = -1;
   }
@@ -106,8 +136,7 @@ void MidiInstrument::Stop(int c) {
 
   Trace::Debug("MIDI INSTR STOP!====");
 
-  Variable *v = FindVariable(FourCC::MidiInstrumentChannel);
-  int channel = v->GetInt();
+  int channel = params_[PARAM_CHANNEL];
 
   for (int i = 0; i < MAX_MIDI_CHORD_NOTES + 1; i++) {
     if (lastNotes_[c][i] == 0) {
@@ -126,16 +155,14 @@ void MidiInstrument::Stop(int c) {
 };
 
 void MidiInstrument::SetChannel(int channel) {
-  Variable *v = FindVariable(FourCC::MidiInstrumentChannel);
-  v->SetInt(channel);
+  SetParamValue(PARAM_CHANNEL, channel);
 };
 
 bool MidiInstrument::Render(int channel, fixed *buffer, int size,
                             bool updateTick) {
 
   // We do it here so we have the opportunity to send some command before
-  Variable *v = FindVariable(FourCC::MidiInstrumentChannel);
-  int mchannel = v->GetInt();
+  int mchannel = params_[PARAM_CHANNEL];
   if (first_[channel]) {
     // send note
     MidiMessage msg;
@@ -232,8 +259,7 @@ bool MidiInstrument::IsInitialized() {
 
 void MidiInstrument::ProcessCommand(int channel, FourCC cc, ushort value) {
 
-  Variable *v = FindVariable(FourCC::MidiInstrumentChannel);
-  int mchannel = v->GetInt();
+  int mchannel = params_[PARAM_CHANNEL];
 
   switch (cc) {
 
@@ -338,8 +364,7 @@ void MidiInstrument::ProcessCommand(int channel, FourCC cc, ushort value) {
 
 etl::string<MAX_INSTRUMENT_NAME_LENGTH> MidiInstrument::GetDefaultName() {
   // use the channel number as a fallback
-  Variable *v = FindVariable(FourCC::MidiInstrumentChannel);
-  int displayChannelNum = v->GetInt() + 1;
+  int displayChannelNum = params_[PARAM_CHANNEL] + 1;
   etl::string<MAX_INSTRUMENT_NAME_LENGTH> name;
   etl::string_stream ss(name);
   ss << "MIDI CH " << etl::setfill('0') << etl::setw(2) << displayChannelNum;
@@ -347,13 +372,11 @@ etl::string<MAX_INSTRUMENT_NAME_LENGTH> MidiInstrument::GetDefaultName() {
 }
 
 int MidiInstrument::GetTable() {
-  Variable *v = FindVariable(FourCC::MidiInstrumentTable);
-  return v->GetInt();
+  return params_[PARAM_TABLE];
 };
 
 bool MidiInstrument::GetTableAutomation() {
-  Variable *v = FindVariable(FourCC::MidiInstrumentTableAutomation);
-  return v->GetBool();
+  return params_[PARAM_TABLE_AUTO] != 0;
 };
 
 void MidiInstrument::GetTableState(TableSaveState &state) {
@@ -369,6 +392,111 @@ void MidiInstrument::SetTableState(TableSaveState &state) {
   memcpy(tableState_.position_, state.position_, sizeof(int) * 3);
   tableState_.groove_ = state.groove_;
 };
+
+// ---------------------------------------------------------------------------
+// Plan B: new parameter API overrides for the packed array.
+// ---------------------------------------------------------------------------
+
+FourCC MidiInstrument::GetParamID(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return FourCC::Default;
+  }
+  return SPECS[idx].id;
+}
+
+const char *MidiInstrument::GetParamName(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return "";
+  }
+  return NAMES[idx];
+}
+
+const char *MidiInstrument::GetParamFormat(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return "%d";
+  }
+  return FORMATS[idx];
+}
+
+int MidiInstrument::GetParamMin(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 0;
+  }
+  return SPECS[idx].min;
+}
+
+int MidiInstrument::GetParamMax(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 0xFFFF;
+  }
+  return SPECS[idx].max;
+}
+
+int MidiInstrument::GetParamDefault(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 0;
+  }
+  return (int)SPECS[idx].default_;
+}
+
+int MidiInstrument::GetParamStep(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 1;
+  }
+  return SPECS[idx].step;
+}
+
+int MidiInstrument::GetParamBigStep(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 1;
+  }
+  return SPECS[idx].big_step;
+}
+
+void MidiInstrument::SetParamValue(int idx, int v) {
+  if (idx < 0 || idx >= kParamCount || idx == PARAM_UNUSED_7) {
+    return;
+  }
+  if (idx == PARAM_NAME) {
+    // Name is stored in name_, not in the packed array.
+    return;
+  }
+  if (v < (int)SPECS[idx].min) {
+    v = SPECS[idx].min;
+  } else if (v > (int)SPECS[idx].max) {
+    v = SPECS[idx].max;
+  }
+  if (params_[idx] == v) {
+    return;
+  }
+  params_[idx] = v;
+  SetChanged();
+  NotifyObservers();
+}
+
+bool MidiInstrument::IsParamModified(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return false;
+  }
+  return params_[idx] != (int)SPECS[idx].default_;
+}
+
+void MidiInstrument::ResetParam(int idx) {
+  if (idx < 0 || idx >= kParamCount || idx == PARAM_NAME ||
+      idx == PARAM_UNUSED_7) {
+    return;
+  }
+  params_[idx] = SPECS[idx].default_;
+}
+
+void MidiInstrument::ResetAllParams() {
+  for (int i = 1; i < kParamCount; i++) { // skip name slot at idx 0
+    if (i == PARAM_UNUSED_7) {
+      continue;
+    }
+    params_[i] = SPECS[i].default_;
+  }
+}
 
 void MidiInstrument::SendProgramChange(int channel, int program) {
   MidiMessage msg;

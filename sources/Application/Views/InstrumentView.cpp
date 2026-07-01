@@ -625,40 +625,40 @@ void InstrumentView::fillMidiParameters() {
   // offset y to account for instrument type, name and export/import fields
   position._y += 3;
 
-  Variable *v = instrument->FindVariable(FourCC::MidiInstrumentChannel);
-  intVarField_.emplace_back(
-      UIIntVarField(position, *v, "channel: %2.2d", 0, 0x0F, 1, 0x04, 1));
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, MidiInstrument::PARAM_CHANNEL,
+      "channel: %2.2d", 0, 0x0F, 1, 0x04, 1));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::MidiInstrumentVolume);
-  intVarField_.emplace_back(
-      UIIntVarField(position, *v, "volume: %2.2X", 0, 0xFF, 1, 0x10));
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, MidiInstrument::PARAM_VOLUME, "volume: %2.2X", 0,
+      0xFF, 1, 0x10));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::MidiInstrumentNoteLength);
-  intVarField_.emplace_back(
-      UIIntVarField(position, *v, "length: %2.2X", 0, 0xFF, 1, 0x10));
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, MidiInstrument::PARAM_NOTE_LENGTH,
+      "length: %2.2X", 0, 0xFF, 1, 0x10));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::MidiInstrumentProgram);
-  intVarOffField_.emplace_back(
-      UIIntVarOffField(position, *v, "program: %2.2X", 0, 0x7F, 1, 0x10));
-  fieldList_.insert(fieldList_.end(), &(*intVarOffField_.rbegin()));
+  paramIntVarOffField_.emplace_back(UIParamIntVarOffField(
+      position, instrument, MidiInstrument::PARAM_PROGRAM, "program: %2.2X", 0,
+      0x7F, 1, 0x10));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarOffField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::MidiInstrumentTableAutomation);
-  intVarField_.emplace_back(
-      UIIntVarField(position, *v, "automation: %s", 0, 1, 1, 1));
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, MidiInstrument::PARAM_TABLE_AUTO,
+      "automation: %s", 0, 1, 1, 1));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::MidiInstrumentTable);
-  intVarOffField_.emplace_back(
-      UIIntVarOffField(position, *v, "table: %2.2X", 0, 0x7F, 1, 0x10));
-  fieldList_.insert(fieldList_.end(), &(*intVarOffField_.rbegin()));
+  paramIntVarOffField_.emplace_back(UIParamIntVarOffField(
+      position, instrument, MidiInstrument::PARAM_TABLE, "table: %2.2X", 0,
+      0x7F, 1, 0x10));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarOffField_.rbegin()));
 };
 
 void InstrumentView::fillOpalParameters() {

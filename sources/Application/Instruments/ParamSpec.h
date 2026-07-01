@@ -37,7 +37,7 @@ struct ParamSpec {
   uint16_t format_off; // 2 B offset into per-class format string table
   int32_t  default_;   // 4 B (signed: -1 Table unbound, 0xF1C8 OPAL ADSR,
                        //            0xFFFF Synth LFODelay all fit comfortably)
-  uint16_t min;        // 2 B
+  int16_t  min;        // 2 B (signed: -1 for Table/Program "off" sentinel)
   uint16_t max;        // 2 B
   uint8_t  step;       // 1 B
   uint8_t  big_step;   // 1 B
