@@ -577,3 +577,38 @@ PersistencyResult PersistencyService::ImportInstrument(I_Instrument *instrument,
              instrumentName.c_str());
   return PERSIST_LOADED;
 }
+
+bool PersistencyService::SaveToBuffer(uint8_t *data, size_t cap,
+                                     size_t &written) {
+  written = 0;
+  if (!data || cap == 0) {
+    Trace::Error("PERSISTENCYSERVICE: SaveToBuffer called with empty target");
+    return false;
+  }
+
+  tinyxml2::XMLPrinter printer;  // internal buffer (no FILE*)
+  printer.OpenElement("PICOTRACKER");
+
+  // Drive the same Persistent::Save loop that SaveProjectData uses,
+  // but with the in-memory printer.
+  for (auto *sub : SubServices()) {
+    auto *currentItem = static_cast<Persistent *>(static_cast<void *>(sub));
+    currentItem->Save(&printer);
+  }
+  printer.CloseElement();
+
+  const char *xml = printer.CStr();
+  if (!xml) {
+    Trace::Error("PERSISTENCYSERVICE: XMLPrinter produced no output");
+    return false;
+  }
+  size_t len = strlen(xml);
+  if (len + 1 > cap) {
+    Trace::Error("PERSISTENCYSERVICE: SaveToBuffer cap %zu < needed %zu",
+                 cap, len + 1);
+    return false;
+  }
+  memcpy(data, xml, len + 1);  // include trailing NUL for symmetry
+  written = len;
+  return true;
+}

@@ -37,6 +37,7 @@ public:
   PersistencyService();
   PersistencyResult Save(const char *projectName, const char *oldProjectName,
                          bool saveAs);
+  bool SaveToBuffer(uint8_t *data, size_t cap, size_t &written);
   PersistencyResult Load(const char *projectName);
   PersistencyResult LoadCurrentProjectName(char *projectName);
   PersistencyResult SaveProjectState(const char *projectName);
