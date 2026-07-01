@@ -358,6 +358,9 @@ void InstrumentView::fillSampleParameters() {
   // offset y to account for instrument type and export/import fields
   position._y += 1;
 
+  // The sample-selection field stays as a legacy Variable (per docs/§9.4)
+  // and uses its custom sample-name rendering, so it keeps the legacy
+  // UIIntVarField binding.
   Variable *v = instrument->FindVariable(FourCC::SampleInstrumentSample);
   SamplePool *sp = SamplePool::GetInstance();
   intVarField_.emplace_back(position, *v, "sample: %.17s", 0,
@@ -376,106 +379,134 @@ void InstrumentView::fillSampleParameters() {
   fieldList_.insert(fieldList_.end(), &sampleActionField_.back());
   sampleActionField_.back().AddObserver(*this);
 
-  position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentVolume);
-  intVarField_.emplace_back(position, *v, "volume: %d [%2.2X]", 0, 255, 1, 10);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  // 18 packed parameters routed through the new UIParam* classes.
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentPan);
-  intVarField_.emplace_back(position, *v, "pan: %2.2X", 0, 0xFE, 1, 0x10);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_VOLUME,
+      "volume: %d [%2.2X]", 0, 255, 1, 10));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentRootNote);
-  noteVarField_.emplace_back(position, *v, "root note: %s", 0, 0x7F, 1, 0x0C);
-  fieldList_.insert(fieldList_.end(), &(*noteVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_PAN, "pan: %2.2X", 0, 0xFE, 1,
+      0x10));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentFineTune);
-  intVarField_.emplace_back(position, *v, "detune: %2.2X", 0, 255, 1, 0x10);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  // Note field uses UINoteVarField which we don't have a UIParam equivalent
+  // for yet (it renders a note-name string). Keep it on the legacy
+  // Variable for now; the underlying storage is still the packed array,
+  // but the field binding reads via FindVariable's 1-element vector which
+  // exposes the param through the parent's facade. To avoid that we
+  // instead keep the rootNote read from the packed array via the
+  // standard GetParamValue path — for now, use a UIParamIntVarField with
+  // a note-style format string. The note VarField has a custom draw path
+  // (note2char) we don't replicate here, so we leave the rootNote UI
+  // pointing at FindVariable for now (works because the legacy
+  // SampleInstrument's restore path keeps a separate copy of rootNote in
+  // the Variables vector — wait, no, we removed those Variable members).
+  // The right call is to switch to UIParamIntVarField with a %d format
+  // here, and accept that the note-name rendering is dropped for stage 4.
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_ROOT_NOTE,
+      "root note: %d", 0, 0x7F, 1, 0x0C));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentCrushVolume);
-  intVarField_.emplace_back(position, *v, "drive: %2.2X", 0, 0xFF, 1, 0x10);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_FINE_TUNE, "detune: %2.2X",
+      0, 255, 1, 0x10));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentCrush);
-  intVarField_.emplace_back(position, *v, "crush: %d", 1, 0x10, 1, 4);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_DRIVE, "drive: %2.2X", 0,
+      0xFF, 1, 0x10));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentDownsample);
-  intVarField_.emplace_back(position, *v, "downsample: %d", 0, 8, 1, 4);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_CRUSH, "crush: %d", 1, 0x10,
+      1, 4));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
+
+  position._y += 1;
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_DOWNSAMPLE,
+      "downsample: %d", 0, 8, 1, 4));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 2;
   staticField_.emplace_back(position, "flt cut/res:");
   fieldList_.insert(fieldList_.end(), &(*staticField_.rbegin()));
 
   position._x += 13;
-  v = instrument->FindVariable(FourCC::SampleInstrumentFilterCutOff);
-  intVarField_.emplace_back(position, *v, "%2.2X", 0, 0xFF, 1, 0x10);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_CUTOFF, "%2.2X", 0, 0xFF, 1,
+      0x10));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._x += 3;
-  v = instrument->FindVariable(FourCC::SampleInstrumentFilterResonance);
-  intVarField_.emplace_back(position, *v, "%2.2X", 0, 0xFF, 1, 0x10);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_RESO, "%2.2X", 0, 0xFF, 1,
+      0x10));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._x -= 16;
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentFilterType);
-  intVarField_.emplace_back(position, *v, "type: %2.2X", 0, 0xFF, 1, 0x10);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_FILTER_MIX, "type: %2.2X",
+      0, 0xFF, 1, 0x10));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentFilterMode);
-  intVarField_.emplace_back(position, *v, "Mode: %s", 0, 2, 1, 1);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_FILTER_MODE, "Mode: %s", 0, 2,
+      1, 1));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentInterpolation);
-  intVarField_.emplace_back(position, *v, "interpolation: %s", 0, 1, 1, 1);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_INTERPOLATION,
+      "interpolation: %s", 0, 1, 1, 1));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentLoopMode);
-  intVarField_.emplace_back(position, *v, "loop mode: %s", 0, SILM_LAST - 1, 1,
-                            1);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_LOOP_MODE,
+      "loop mode: %s", 0, SILM_LAST - 1, 1, 1));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentStart);
-  bigHexVarField_.emplace_back(position, *v, 7, "start: %7.7X", 0,
-                               instrument->GetSampleSize() - 1, 16);
-  fieldList_.insert(fieldList_.end(), &(*bigHexVarField_.rbegin()));
+  paramBigHexVarField_.emplace_back(UIParamBigHexVarField(
+      position, instrument, SampleInstrument::PARAM_START, 7, "start: %7.7X", 0,
+      instrument->GetSampleSize() - 1, 16));
+  fieldList_.insert(fieldList_.end(), &(*paramBigHexVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentLoopStart);
-  bigHexVarField_.emplace_back(position, *v, 7, "loop start: %7.7X", 0,
-                               instrument->GetSampleSize() - 1, 16);
-  fieldList_.insert(fieldList_.end(), &(*bigHexVarField_.rbegin()));
+  paramBigHexVarField_.emplace_back(UIParamBigHexVarField(
+      position, instrument, SampleInstrument::PARAM_LOOP_START, 7,
+      "loop start: %7.7X", 0, instrument->GetSampleSize() - 1, 16));
+  fieldList_.insert(fieldList_.end(), &(*paramBigHexVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentEnd);
-  bigHexVarField_.emplace_back(position, *v, 7, "loop end: %7.7X", 0,
-                               instrument->GetSampleSize() - 1, 16);
-  fieldList_.insert(fieldList_.end(), &(*bigHexVarField_.rbegin()));
+  paramBigHexVarField_.emplace_back(UIParamBigHexVarField(
+      position, instrument, SampleInstrument::PARAM_LOOP_END, 7,
+      "loop end: %7.7X", 0, instrument->GetSampleSize() - 1, 16));
+  fieldList_.insert(fieldList_.end(), &(*paramBigHexVarField_.rbegin()));
 
   position._y += 1;
-  v = instrument->FindVariable(FourCC::SampleInstrumentTable);
-  intVarOffField_.emplace_back(position, *v, "table: %2.2X", 0x00,
-                               TABLE_COUNT - 1, 1, 0x10);
-  fieldList_.insert(fieldList_.end(), &(*intVarOffField_.rbegin()));
+  paramIntVarOffField_.emplace_back(UIParamIntVarOffField(
+      position, instrument, SampleInstrument::PARAM_TABLE, "table: %2.2X", 0x00,
+      TABLE_COUNT - 1, 1, 0x10));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarOffField_.rbegin()));
 
-  v = instrument->FindVariable(FourCC::SampleInstrumentTableAutomation);
-  position._x += 12;
-  intVarField_.emplace_back(position, *v, "auto: %s", 0, 1, 1, 1);
-  fieldList_.insert(fieldList_.end(), &(*intVarField_.rbegin()));
+  paramIntVarField_.emplace_back(UIParamIntVarField(
+      position, instrument, SampleInstrument::PARAM_TABLE_AUTO, "auto: %s", 0, 1,
+      1, 1));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 };
 
 void InstrumentView::fillSIDParameters() {

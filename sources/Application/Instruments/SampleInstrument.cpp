@@ -41,27 +41,98 @@ signed char SampleInstrument::lastMidiNote_[SONG_CHANNEL_COUNT];
 
 #define KRATE_SAMPLE_COUNT 100
 
+// ---------------------------------------------------------------------------
+// Plan B: static ParamSpec / NAMES / FORMATS tables for SampleInstrument.
+//
+// Each ParamSpec takes 20 B in flash. 19 specs ≈ 380 B. Persistence formats
+// are plain decimal for round-trip compatibility with existing .pti files.
+// UI display formatting ("%2.2X", "%s" for char-lists) is supplied by the
+// UIParamIntVarField's own format string at the call site.
+// ---------------------------------------------------------------------------
+
+// ParamSpec positional layout (matches ParamSpec.h):
+//   id (FourCC), _pad0 (u8), name_off (u16), format_off (u16),
+//   default_ (i32), min (u16), max (u16), step (u8), big_step (u8),
+//   _pad1 (u8), _pad2 (u8)
+const ParamSpec SampleInstrument::SPECS[SampleInstrument::kParamCount] = {
+    // [0] reserved name slot
+    {FourCC::InstrumentName, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0},
+    // [1] Volume
+    {FourCC::SampleInstrumentVolume, 0, 1, 1, 0x80, 0, 0xFF, 1, 0x10, 0, 0},
+    // [2] Interpolation (CHAR_LIST, 2 entries)
+    {FourCC::SampleInstrumentInterpolation, 0, 2, 1, 0, 0, 1, 1, 1, 0, 0},
+    // [3] Crush
+    {FourCC::SampleInstrumentCrush, 0, 3, 1, 16, 0, 0x10, 1, 1, 0, 0},
+    // [4] Drive
+    {FourCC::SampleInstrumentCrushVolume, 0, 4, 1, 0xFF, 0, 0xFF, 1, 0x10, 0, 0},
+    // [5] Downsample
+    {FourCC::SampleInstrumentDownsample, 0, 5, 1, 0, 0, 0xFFFF, 1, 1, 0, 0},
+    // [6] RootNote
+    {FourCC::SampleInstrumentRootNote, 0, 6, 1, 60, 0, 127, 1, 12, 0, 0},
+    // [7] FineTune
+    {FourCC::SampleInstrumentFineTune, 0, 7, 1, 0x7F, 0, 0x7F, 1, 1, 0, 0},
+    // [8] Pan
+    {FourCC::SampleInstrumentPan, 0, 8, 1, 0x7F, 0, 0x7F, 1, 1, 0, 0},
+    // [9] Cutoff
+    {FourCC::SampleInstrumentFilterCutOff, 0, 9, 1, 0xFF, 0, 0xFF, 1, 0x10, 0, 0},
+    // [10] Reso
+    {FourCC::SampleInstrumentFilterResonance, 0, 10, 1, 0, 0, 0xFF, 1, 0x10, 0, 0},
+    // [11] FilterMix
+    {FourCC::SampleInstrumentFilterType, 0, 11, 1, 0, 0, 0xFF, 1, 0x10, 0, 0},
+    // [12] FilterMode (CHAR_LIST, 4 entries)
+    {FourCC::SampleInstrumentFilterMode, 0, 12, 1, 0, 0, 3, 1, 1, 0, 0},
+    // [13] Start
+    {FourCC::SampleInstrumentStart, 0, 13, 1, 0, 0, 0xFFFF, 1, 0xFF, 0, 0},
+    // [14] LoopMode (CHAR_LIST, 6 entries)
+    {FourCC::SampleInstrumentLoopMode, 0, 14, 1, 0, 0, SILM_LAST - 1, 1, 1, 0, 0},
+    // [15] LoopStart
+    {FourCC::SampleInstrumentLoopStart, 0, 15, 1, 0, 0, 0xFFFF, 1, 0xFF, 0, 0},
+    // [16] LoopEnd
+    {FourCC::SampleInstrumentEnd, 0, 16, 1, 0, 0, 0xFFFF, 1, 0xFF, 0, 0},
+    // [17] Table (default -1 == "no table bound")
+    {FourCC::SampleInstrumentTable, 0, 17, 1, -1, 0, 0x7F, 1, 0x10, 0, 0},
+    // [18] TableAutomation (bool)
+    {FourCC::SampleInstrumentTableAutomation, 0, 18, 1, 0, 0, 1, 1, 1, 0, 0},
+};
+
+const char *const SampleInstrument::NAMES[SampleInstrument::kParamCount] = {
+    /*  0 */ "InstrumentName",
+    /*  1 */ "SampleInstrumentVolume",
+    /*  2 */ "SampleInstrumentInterpolation",
+    /*  3 */ "SampleInstrumentCrush",
+    /*  4 */ "SampleInstrumentCrushVolume",
+    /*  5 */ "SampleInstrumentDownsample",
+    /*  6 */ "SampleInstrumentRootNote",
+    /*  7 */ "SampleInstrumentFineTune",
+    /*  8 */ "SampleInstrumentPan",
+    /*  9 */ "SampleInstrumentFilterCutOff",
+    /* 10 */ "SampleInstrumentFilterResonance",
+    /* 11 */ "SampleInstrumentFilterType",
+    /* 12 */ "SampleInstrumentFilterMode",
+    /* 13 */ "SampleInstrumentStart",
+    /* 14 */ "SampleInstrumentLoopMode",
+    /* 15 */ "SampleInstrumentLoopStart",
+    /* 16 */ "SampleInstrumentEnd",
+    /* 17 */ "SampleInstrumentTable",
+    /* 18 */ "SampleInstrumentTableAutomation",
+};
+
+const char *const SampleInstrument::FORMATS[SampleInstrument::kParamCount] = {
+    "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d",
+    "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d",
+};
+
 SampleInstrument::SampleInstrument()
-    : I_Instrument(&variables_), sample_(FourCC::SampleInstrumentSample),
-      volume_(FourCC::SampleInstrumentVolume, 0x80),
-      interpolation_(FourCC::SampleInstrumentInterpolation, interpolationTypes,
-                     2, 0),
-      crush_(FourCC::SampleInstrumentCrush, 16),
-      drive_(FourCC::SampleInstrumentCrushVolume, 0xFF),
-      downsample_(FourCC::SampleInstrumentDownsample, 0),
-      rootNote_(FourCC::SampleInstrumentRootNote, 60),
-      fineTune_(FourCC::SampleInstrumentFineTune, 0x7F),
-      pan_(FourCC::SampleInstrumentPan, 0x7F),
-      cutoff_(FourCC::SampleInstrumentFilterCutOff, 0xFF),
-      reso_(FourCC::SampleInstrumentFilterResonance, 0x00),
-      filterMix_(FourCC::SampleInstrumentFilterType, 0x00),
-      filterMode_(FourCC::SampleInstrumentFilterMode, filterMode, 3, 0),
-      start_(FourCC::SampleInstrumentStart, 0),
-      loopMode_(FourCC::SampleInstrumentLoopMode, loopTypes, SILM_LAST, 0),
-      loopStart_(FourCC::SampleInstrumentLoopStart, 0),
-      loopEnd_(FourCC::SampleInstrumentEnd, 0),
-      table_(FourCC::SampleInstrumentTable, -1),
-      tableAuto_(FourCC::SampleInstrumentTableAutomation, false) {
+    : I_Instrument(&variables_), sample_(FourCC::SampleInstrumentSample) {
+
+  // Initialise the packed array to each ParamSpec's default. Mirrors the
+  // legacy Variable member initialisers in the pre-stage-4 constructor.
+  for (int i = 0; i < kParamCount; i++) {
+    params_[i] = SPECS[i].default_;
+  }
+  // ParamSpec::default_ is uint16_t; the legacy Variable initialised the
+  // Table with -1. Re-apply the unbound sentinel explicitly.
+  params_[PARAM_TABLE] = -1;
 
   // Initialize MIDI notes
   for (int i = 0; i < SONG_CHANNEL_COUNT; i++) {
@@ -73,33 +144,10 @@ SampleInstrument::SampleInstrument()
   dirty_ = false;
   running_ = false;
 
-  // Initialize exported variables
-  // name_ is now an etl::string in the base class, not a Variable
+  // Stage 4: only the SampleInstrumentSample field stays in the legacy
+  // Variables() list. The 18 migrated parameters are not exposed there.
   variables_.insert(variables_.end(), &sample_);
   sample_.AddObserver(*this);
-
-  variables_.insert(variables_.end(), &volume_);
-  variables_.insert(variables_.end(), &interpolation_);
-  variables_.insert(variables_.end(), &crush_);
-  variables_.insert(variables_.end(), &drive_);
-  variables_.insert(variables_.end(), &downsample_);
-  variables_.insert(variables_.end(), &rootNote_);
-  variables_.insert(variables_.end(), &fineTune_);
-  variables_.insert(variables_.end(), &pan_);
-  variables_.insert(variables_.end(), &cutoff_);
-  variables_.insert(variables_.end(), &reso_);
-  variables_.insert(variables_.end(), &filterMix_);
-  variables_.insert(variables_.end(), &filterMode_);
-  variables_.insert(variables_.end(), &start_);
-  start_.AddObserver(*this);
-  variables_.insert(variables_.end(), &loopMode_);
-  loopMode_.SetInt(0);
-  variables_.insert(variables_.end(), &loopStart_);
-  loopStart_.AddObserver(*this);
-  variables_.insert(variables_.end(), &loopEnd_);
-  loopEnd_.AddObserver(*this);
-  variables_.insert(variables_.end(), &table_);
-  variables_.insert(variables_.end(), &tableAuto_);
 
   tableState_.Reset();
   slicePoints_.fill(0);
@@ -393,30 +441,30 @@ bool SampleInstrument::Start(int channel, unsigned char midinote,
   uint32_t sampleSizeU = sampleSize > 0 ? static_cast<uint32_t>(sampleSize) : 0;
 
   int rootNote =
-      (rootNote_.GetInt() - 60) + source_->GetRootNote(rp->midiNote_);
+      (params_[PARAM_ROOT_NOTE] - 60) + source_->GetRootNote(rp->midiNote_);
 
-  rp->volume_ = rp->baseVolume_ = i2fp(volume_.GetInt());
+  rp->volume_ = rp->baseVolume_ = i2fp(params_[PARAM_VOLUME]);
 
-  rp->pan_ = rp->basePan_ = i2fp(pan_.GetInt());
+  rp->pan_ = rp->basePan_ = i2fp(params_[PARAM_PAN]);
 
   if (!source_->IsMulti()) {
-    rp->rendLoopStart_ = loopStart_.GetInt();
-    rp->rendLoopEnd_ = loopEnd_.GetInt();
+    rp->rendLoopStart_ = params_[PARAM_LOOP_START];
+    rp->rendLoopEnd_ = params_[PARAM_LOOP_END];
   } else {
     long start = source_->GetLoopStart(rp->midiNote_);
     if (start > 0) {
       rp->rendLoopStart_ =
           source_->GetLoopStart(rp->midiNote_); // hack at the moment
       rp->rendLoopEnd_ = source_->GetLoopEnd(rp->midiNote_);
-      loopMode_.SetInt(SILM_LOOP);
+      SetParamValue(PARAM_LOOP_MODE, SILM_LOOP);
     } else {
       rp->rendLoopStart_ = 0;                             // hack at the moment
       rp->rendLoopEnd_ = source_->GetSize(rp->midiNote_); // hack at the moment
-      loopMode_.SetInt(SILM_ONESHOT);
+      SetParamValue(PARAM_LOOP_MODE, SILM_ONESHOT);
     };
   }
   SampleInstrumentLoopMode loopmode =
-      (SampleInstrumentLoopMode)loopMode_.GetInt();
+      (SampleInstrumentLoopMode)params_[PARAM_LOOP_MODE];
 
   size_t sliceIndex = 0;
   bool sliceActive = shouldUseSlice(midinote, sliceIndex, sampleSizeU);
@@ -462,7 +510,7 @@ bool SampleInstrument::Start(int channel, unsigned char midinote,
     // if instrument sampled below 44.1Khz, should
     // travel slower in sample
 
-    rp->rendFirst_ = start_.GetInt();
+    rp->rendFirst_ = params_[PARAM_START];
     rp->position_ = float(rp->rendFirst_);
     rp->baseSpeed_ = fl2fp(source_->GetSampleRate(rp->midiNote_) / driverRate);
     rp->reverse_ = (rp->rendLoopEnd_ < rp->position_);
@@ -522,7 +570,7 @@ bool SampleInstrument::Start(int channel, unsigned char midinote,
 
   // Compute octave & note difference from root
 
-  float fineTune = float(fineTune_.GetInt() - 0x7F);
+  float fineTune = float(params_[PARAM_FINE_TUNE] - 0x7F);
   fineTune /= float(0x80);
   int offset = midinote - rootNote;
   if (sliceActive) {
@@ -561,15 +609,15 @@ bool SampleInstrument::Start(int channel, unsigned char midinote,
 
     // Init filter params
 
-    rp->cutoff_ = rp->baseFCut_ = fl2fp(cutoff_.GetInt() / 255.0f);
-    rp->reso_ = rp->baseFRes_ = fl2fp(reso_.GetInt() / 255.0f);
+    rp->cutoff_ = rp->baseFCut_ = fl2fp(params_[PARAM_CUTOFF] / 255.0f);
+    rp->reso_ = rp->baseFRes_ = fl2fp(params_[PARAM_RESO] / 255.0f);
 
     // Init crush params
-    rp->crush_ = crush_.GetInt();
-    rp->drive_ = drive_.GetInt();
+    rp->crush_ = params_[PARAM_CRUSH];
+    rp->drive_ = params_[PARAM_DRIVE];
 
     // Init downsampling
-    rp->downsample_ = downsample_.GetInt();
+    rp->downsample_ = params_[PARAM_DOWNSAMPLE];
 
     // Disable all active updaters for new voice
     for (auto it = rp->activeUpdaters_.begin(); it != rp->activeUpdaters_.end();
@@ -631,8 +679,8 @@ bool SampleInstrument::Render(int channel, fixed *buffer, int size,
 
     bool hasUpdaters = !(rp->activeUpdaters_.empty());
 
-    int filterMix = filterMix_.GetInt();
-    FilterMode filterMode = (FilterMode)filterMode_.GetInt();
+    int filterMix = params_[PARAM_FILTER_MIX];
+    FilterMode filterMode = (FilterMode)params_[PARAM_FILTER_MODE];
     bool filterBoost = (filterMode == FM_SCREAM);
     bool bassyFilter = (filterMode == FM_BASSY);
 
@@ -712,7 +760,7 @@ bool SampleInstrument::Render(int channel, fixed *buffer, int size,
 
     // Interpolation
 
-    int interpol = interpolation_.GetInt();
+    int interpol = params_[PARAM_INTERPOLATION];
 
     // Get sound characteristics
 
@@ -1480,7 +1528,18 @@ etl::string<MAX_INSTRUMENT_NAME_LENGTH> SampleInstrument::GetDisplayName() {
 };
 
 void SampleInstrument::SaveContent(tinyxml2::XMLPrinter *printer) {
+  // Parent writes InstrumentName + the 18 packed parameters via the new
+  // index-based API. The sample-selection field stays a legacy Variable per
+  // docs/§9.4 — write it ourselves with the existing on-disk format
+  // (sample name as a string), then append slice-point entries.
   I_Instrument::SaveContent(printer);
+
+  // SampleInstrumentSample: write as a separate PARAM (legacy field,
+  // round-trips through the existing parser).
+  printer->OpenElement("PARAM");
+  printer->PushAttribute("NAME", "SampleInstrumentSample");
+  printer->PushAttribute("VALUE", sample_.GetString().c_str());
+  printer->CloseElement();
 
   for (size_t i = 0; i < slicePoints_.size(); ++i) {
     if (slicePoints_[i] == 0) {
@@ -1538,16 +1597,16 @@ void SampleInstrument::RestoreContent(PersistencyDocument *doc) {
         SetName(value.c_str());
       } else if (!strncasecmp(name.c_str(), "SL", 2)) {
         setSliceFromString(name.c_str() + 2, value.c_str());
+      } else if (!strcasecmp(name.c_str(), "SampleInstrumentSample")) {
+        // Legacy sample-selection field — keep the existing Variable path
+        // so the sample-pool name lookup continues to work.
+        sample_.SetString(value.c_str());
       } else {
-        bool found = false;
-        for (auto it = Variables()->begin(); it != Variables()->end(); it++) {
-          if (!strcasecmp((*it)->GetName(), name.c_str())) {
-            (*it)->SetString(value.c_str());
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
+        // 18 packed parameters: look up by name via the new API.
+        int idx = FindParamByName(name.c_str());
+        if (idx >= 0) {
+          SetParamValue(idx, atoi(value.c_str()));
+        } else {
           Trace::Error("Parameter '%s' not found in instrument", name.c_str());
         }
       }
@@ -1577,14 +1636,16 @@ bool SampleInstrument::IsEmpty() {
 };
 
 int SampleInstrument::GetTable() {
-  int result = table_.GetInt();
+  int result = params_[PARAM_TABLE];
   if (result > TABLE_COUNT) {
     return VAR_OFF;
   }
   return result;
 };
 
-bool SampleInstrument::GetTableAutomation() { return tableAuto_.GetBool(); };
+bool SampleInstrument::GetTableAutomation() {
+  return params_[PARAM_TABLE_AUTO] != 0;
+};
 
 void SampleInstrument::GetTableState(TableSaveState &state) {
   memcpy(state.hopCount_, tableState_.hopCount_,
@@ -1599,6 +1660,108 @@ void SampleInstrument::SetTableState(TableSaveState &state) {
   memcpy(tableState_.position_, state.position_, sizeof(int) * 3);
   tableState_.groove_ = state.groove_;
 };
+
+// ---------------------------------------------------------------------------
+// Plan B: new parameter API overrides for the packed array.
+// ---------------------------------------------------------------------------
+
+FourCC SampleInstrument::GetParamID(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return FourCC::Default;
+  }
+  return SPECS[idx].id;
+}
+
+const char *SampleInstrument::GetParamName(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return "";
+  }
+  return NAMES[idx];
+}
+
+const char *SampleInstrument::GetParamFormat(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return "%d";
+  }
+  return FORMATS[idx];
+}
+
+int SampleInstrument::GetParamMin(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 0;
+  }
+  return SPECS[idx].min;
+}
+
+int SampleInstrument::GetParamMax(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 0xFFFF;
+  }
+  return SPECS[idx].max;
+}
+
+int SampleInstrument::GetParamDefault(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 0;
+  }
+  return (int)SPECS[idx].default_;
+}
+
+int SampleInstrument::GetParamStep(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 1;
+  }
+  return SPECS[idx].step;
+}
+
+int SampleInstrument::GetParamBigStep(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return 1;
+  }
+  return SPECS[idx].big_step;
+}
+
+void SampleInstrument::SetParamValue(int idx, int v) {
+  if (idx < 0 || idx >= kParamCount) {
+    return;
+  }
+  if (idx == PARAM_NAME) {
+    // Name is stored in name_, not in the packed array.
+    return;
+  }
+  if (v < (int)SPECS[idx].min) {
+    v = SPECS[idx].min;
+  } else if (v > (int)SPECS[idx].max) {
+    v = SPECS[idx].max;
+  }
+  if (params_[idx] == v) {
+    return;
+  }
+  params_[idx] = v;
+  SetChanged();
+  NotifyObservers();
+}
+
+bool SampleInstrument::IsParamModified(int idx) const {
+  if (idx < 0 || idx >= kParamCount) {
+    return false;
+  }
+  return params_[idx] != (int)SPECS[idx].default_;
+}
+
+void SampleInstrument::ResetParam(int idx) {
+  if (idx < 0 || idx >= kParamCount || idx == PARAM_NAME) {
+    return;
+  }
+  params_[idx] = SPECS[idx].default_;
+}
+
+void SampleInstrument::ResetAllParams() {
+  for (int i = 1; i < kParamCount; i++) { // skip name slot at idx 0
+    params_[i] = SPECS[i].default_;
+  }
+  params_[PARAM_TABLE] = -1; // restore legacy default
+}
 
 bool SampleInstrument::IsMulti() { return source_->IsMulti(); }
 

@@ -17,6 +17,7 @@
 #include "Foundation/Types/Types.h"
 #include "Foundation/Variables/WatchedVariable.h"
 #include "I_Instrument.h"
+#include "ParamSpec.h"
 #include "SRPUpdaters.h"
 #include "SampleRenderingParams.h"
 #include "SampleVariable.h"
@@ -37,6 +38,41 @@ enum SampleInstrumentLoopMode {
 class SampleInstrument : public I_Instrument, I_Observer {
 
 public:
+  // 18 packed UI parameters + 1 reserved name slot. Index 0 is the
+  // instrument name in this uniform param table; the actual string lives in
+  // the base-class `name_` member. Indices 1..18 are the sample parameters
+  // in the same order as the legacy Variables() list (excluding the
+  // SampleInstrumentSample field, which stays as a legacy Variable per
+  // docs/§9.4).
+  static constexpr int kParamCount = 19;
+  static const ParamSpec SPECS[kParamCount];
+  static const char *const NAMES[kParamCount];
+  static const char *const FORMATS[kParamCount];
+
+  // Parameter indices into params_[]. Used by fillSampleParameters and the
+  // runtime hooks (Start / RestoreContent) to read/write the packed array.
+  enum ParamIdx {
+    PARAM_NAME = 0,
+    PARAM_VOLUME = 1,
+    PARAM_INTERPOLATION = 2,
+    PARAM_CRUSH = 3,
+    PARAM_DRIVE = 4,
+    PARAM_DOWNSAMPLE = 5,
+    PARAM_ROOT_NOTE = 6,
+    PARAM_FINE_TUNE = 7,
+    PARAM_PAN = 8,
+    PARAM_CUTOFF = 9,
+    PARAM_RESO = 10,
+    PARAM_FILTER_MIX = 11,
+    PARAM_FILTER_MODE = 12,
+    PARAM_START = 13,
+    PARAM_LOOP_MODE = 14,
+    PARAM_LOOP_START = 15,
+    PARAM_LOOP_END = 16,
+    PARAM_TABLE = 17,
+    PARAM_TABLE_AUTO = 18,
+  };
+
   SampleInstrument();
   virtual ~SampleInstrument();
   // I_Instrument implementation
@@ -53,7 +89,15 @@ public:
   virtual bool GetTableAutomation();
   virtual void GetTableState(TableSaveState &state);
   virtual void SetTableState(TableSaveState &state);
-  const etl::ivector<Variable *> *Variables() const { return &variables_; };
+
+  // Stage 4: returns a 1-element vector containing just `sample_`. The
+  // 18 migrated parameters live in the packed array and are *not* reachable
+  // through the legacy Variables() list — that path stays only because
+  // SampleInstrumentSample is still a legacy Variable (per docs/§9.4) and
+  // FindVariable(SampleInstrumentSample) is still called in a few places.
+  const etl::ivector<Variable *> *Variables() const override {
+    return &variables_;
+  }
 
   bool IsMulti();
 
@@ -91,13 +135,39 @@ public:
   virtual void RestoreContent(PersistencyDocument *doc) override;
   void Purge();
 
+  // --- Plan B new parameter API (stage 4: directly on packed array) ---
+  virtual int GetParamCount() const override { return kParamCount; }
+  virtual FourCC GetParamID(int idx) const override;
+  virtual const char *GetParamName(int idx) const override;
+  virtual const char *GetParamFormat(int idx) const override;
+  virtual int GetParamMin(int idx) const override;
+  virtual int GetParamMax(int idx) const override;
+  virtual int GetParamDefault(int idx) const override;
+  virtual int GetParamStep(int idx) const override;
+  virtual int GetParamBigStep(int idx) const override;
+  virtual int GetParamValue(int idx) const override { return params_[idx]; }
+  virtual void SetParamValue(int idx, int v) override;
+  virtual bool IsParamModified(int idx) const override;
+  virtual void ResetParam(int idx) override;
+  virtual void ResetAllParams() override;
+
 protected:
   void updateInstrumentData(bool search);
   void doTickUpdate(int channel);
   void doKRateUpdate(int channel);
 
 private:
-  etl::vector<Variable *, 21> variables_;
+  // 1-element legacy Variables() vector — only SampleInstrumentSample lives
+  // here. The 18 migrated parameters are not exposed via Variables() at all
+  // (the field layer uses the new UIParam* classes for those).
+  etl::vector<Variable *, 1> variables_;
+
+  // Packed parameter storage. Replaces 18 Variable members; the legacy
+  // SampleInstrumentSample (sample_) and slicePoints_ stay outside the
+  // packed array.
+  int32_t params_[kParamCount];
+  static_assert(sizeof(params_) == kParamCount * 4,
+                "params_ must be tightly packed");
 
   SoundSource *source_;
   __attribute__((section(".DTCMRAM"))) static struct renderParams
@@ -108,25 +178,12 @@ private:
 
   static signed char lastMidiNote_[SONG_CHANNEL_COUNT];
   static fixed lastSample_[SONG_CHANNEL_COUNT][2];
+
+  // SampleInstrumentSample stays as a legacy Variable per docs/§9.4 — its
+  // custom UI renderer (sample-name lookup via the SamplePool name list) and
+  // custom persistence path are out of scope for the Plan B migration.
   SampleVariable sample_;
-  Variable volume_;
-  Variable interpolation_;
-  Variable crush_;
-  Variable drive_;
-  Variable downsample_;
-  Variable rootNote_;
-  Variable fineTune_;
-  Variable pan_;
-  Variable cutoff_;
-  Variable reso_;
-  Variable filterMix_;
-  Variable filterMode_;
-  WatchedVariable start_;
-  Variable loopMode_;
-  WatchedVariable loopStart_;
-  WatchedVariable loopEnd_;
-  Variable table_;
-  Variable tableAuto_;
+
   // TODO (democloid): evaluate if this should be in DTCMRAM
   etl::array<uint32_t, MaxSlices> slicePoints_;
 
@@ -139,4 +196,16 @@ private:
   bool hasAnySliceValue() const;
   void clampSlicePoints(uint32_t sampleSize);
 };
+
+// Sized so the etl::pool<SampleInstrument, 16> allocation is bounded; bump
+// this ceiling if a future patch legitimately grows the instrument. The
+// dominant fixed cost is the SampleVariable sample_ (a Variable with custom
+// sample-name rendering) + the slicePoints_ array + the I_Instrument /
+// VariableContainer / Observable / Persistent base classes. The packed
+// 19-slot params_ array is just 76 B. Pre-migration shape was ~700 B
+// (18 Variables × 32 B + 21-vec + 64 B slice points).
+static_assert(sizeof(SampleInstrument) <= 416,
+              "SampleInstrument exceeds stage-4 budget — re-measure params_/"
+              "sample_/slicePoints_ for unexpected growth");
+
 #endif
