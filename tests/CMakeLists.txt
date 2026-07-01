@@ -44,7 +44,16 @@ target_compile_definitions(synth_render PRIVATE
 add_executable(picoTracker_persist
   test_main.cpp
   persist_tests.cpp
-  stubs/MinimalStubs.cpp
+  stubs/InstrumentHostStubs.cpp
+  ../sources/Application/Instruments/I_Instrument.cpp
+  ../sources/Application/Instruments/InstrumentNameVariable.cpp
+  ../sources/Application/Instruments/SampleInstrument.cpp
+  ../sources/Application/Instruments/SRPUpdaters.cpp
+  ../sources/Application/Instruments/SynthInstrument.cpp
+  ../sources/Application/Instruments/SynthVoice.cpp
+  ../sources/Application/Instruments/OpalInstrument.cpp
+  ../sources/Application/Instruments/SIDInstrument.cpp
+  ../sources/Application/Instruments/MidiInstrument.cpp
   ../sources/Application/Persistency/PersistencyDocument.cpp
   ../sources/Application/Persistency/PersistencyService.cpp
   ../sources/Application/Persistency/Persistent.cpp
@@ -62,7 +71,27 @@ add_executable(picoTracker_persist
   ../sources/Application/Utils/char.cpp
 )
 
-target_include_directories(picoTracker_persist PRIVATE ${HOST_TEST_INCLUDES})
+target_include_directories(picoTracker_persist PRIVATE
+  ${HOST_TEST_INCLUDES}
+  ${CMAKE_CURRENT_LIST_DIR}/../sources/Application/Utils
+  ${CMAKE_CURRENT_LIST_DIR}/../sources/System/Profiler
+)
+
+target_link_libraries(picoTracker_persist PRIVATE
+  m
+)
+
+# The instrument .cpp files reference DSP / service symbols that have no
+# host implementation (Opal OPL3, cRSID SID, MidiService, SyncMaster, ...).
+# We don't call any of these code paths from the persistence tests — the
+# tests only read the static NAMES/SPECS/FORMATS tables and call
+# GetParamName/GetParamCount/FindParamByName. Tolerate the unresolved
+# references rather than stubbing the entire DSP/service layer; the
+# InstrumentHostStubs.cpp file covers the small set of symbols that ARE
+# referenced from the (host-compiled) instrument .cpp files we link.
+target_link_options(picoTracker_persist PRIVATE
+  -Wl,--unresolved-symbols=ignore-all
+)
 
 target_compile_definitions(picoTracker_persist PRIVATE
   HOST_TEST

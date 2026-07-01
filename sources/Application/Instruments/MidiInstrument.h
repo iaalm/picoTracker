@@ -158,8 +158,10 @@ private:
 // shape was ~330 B (7 Variables × 32 B + 7-vec). The dominant fixed cost
 // here is the etl::array<uint8_t, 5> lastNotes_ per channel (8 channels
 // = 40 B) + 8 bools (first_) + ~20 B of pitch-bend state.
+#ifndef HOST_TEST
 static_assert(sizeof(MidiInstrument) <= 288,
               "MidiInstrument exceeds stage-5 budget — re-measure params_/"
               "pitch-bend state for unexpected growth");
+#endif
 
 #endif

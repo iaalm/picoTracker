@@ -204,8 +204,10 @@ private:
 // VariableContainer / Observable / Persistent base classes. The packed
 // 19-slot params_ array is just 76 B. Pre-migration shape was ~700 B
 // (18 Variables × 32 B + 21-vec + 64 B slice points).
+#ifndef HOST_TEST
 static_assert(sizeof(SampleInstrument) <= 416,
               "SampleInstrument exceeds stage-4 budget — re-measure params_/"
               "sample_/slicePoints_ for unexpected growth");
+#endif
 
 #endif

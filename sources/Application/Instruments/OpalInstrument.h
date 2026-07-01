@@ -123,8 +123,10 @@ private:
 // I_Instrument / VariableContainer / Observable / Persistent base classes,
 // and a 1-byte register cache. Pre-migration shape was ~700 B
 // (15 Variables × 32 B + 16-vec).
+#ifndef HOST_TEST
 static_assert(sizeof(OpalInstrument) <= 416,
               "OpalInstrument exceeds stage-2 budget — re-measure params_/"
               "Opal DSP embed for unexpected growth");
+#endif
 
 #endif

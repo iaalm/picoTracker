@@ -44,6 +44,12 @@ struct ParamSpec {
   uint8_t  _pad1;      // 1 B (alignment / future flags)
   uint8_t _pad2;       // 1 B (round struct to 4-byte alignment for default_)
 };
+#ifndef HOST_TEST
+// On host, ETL's enum_type wraps FourCC as a 4-byte object instead of char
+// (RP2040 char-sized); this padding cascades through ParamSpec and breaks the
+// on-device 20-byte layout. The on-device budget is enforced by the firmware
+// build; the host build only needs ParamSpec to compile.
 static_assert(sizeof(ParamSpec) == 20, "ParamSpec must be 20 B");
+#endif
 
 #endif
