@@ -30,6 +30,13 @@
 #define INSTRUMENT_FILE_EXTENSION ".pti"
 #define THEME_FILE_EXTENSION ".ptt"
 
+// Upper bound for the size of a project data file (lgptsav.dat or
+// autosave.dat). Used by PersistencyService::Load to size the stack
+// buffer that feeds PersistencyService::LoadFromBuffer. 32 KiB is
+// generous for the current schema (64 instruments worth of params +
+// chain + theme + pool config) without resorting to heap allocation.
+#define MAX_PROJECT_FILE_SIZE (32 * 1024)
+
 #define RECORDING_FILENAME "REC01.wav"
 
 #endif // _PERSISTENCE_CONSTANTS_H_

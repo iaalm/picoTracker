@@ -39,6 +39,7 @@ public:
                          bool saveAs);
   bool SaveToBuffer(uint8_t *data, size_t cap, size_t &written);
   PersistencyResult Load(const char *projectName);
+  PersistencyResult LoadFromBuffer(const uint8_t *data, size_t len);
   PersistencyResult LoadCurrentProjectName(char *projectName);
   PersistencyResult SaveProjectState(const char *projectName);
   PersistencyResult CreateProject();
@@ -69,6 +70,12 @@ private:
   etl::string<MAX_PROJECT_SAMPLE_PATH_LENGTH> pathBufferA;
   etl::string<MAX_PROJECT_SAMPLE_PATH_LENGTH> pathBufferB;
   char deleteNameBuffer_[PFILENAME_SIZE];
+  // Scratch buffer used by Load(name) to stage the project file into
+  // memory before handing it to LoadFromBuffer. Sized to MAX_PROJECT_FILE_SIZE
+  // and stored as a member (not a stack local) because RP2040 caps the
+  // stack frame at ~2 KiB. Persistence is single-threaded so a single
+  // instance buffer is safe.
+  uint8_t loadBuffer_[MAX_PROJECT_FILE_SIZE];
 };
 
 #endif

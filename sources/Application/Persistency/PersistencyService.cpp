@@ -298,11 +298,53 @@ PersistencyResult PersistencyService::Load(const char *projectName) {
   projectFilePath.append("/");
   projectFilePath.append(filename);
 
-  PersistencyDocument doc;
-  if (!doc.Load(projectFilePath.c_str()))
+  // Read the file into the instance buffer (loadBuffer_), then route
+  // through LoadFromBuffer. The buffer is a member because RP2040 caps
+  // the stack frame at ~2 KiB and project files can be tens of KiB.
+  auto fp = fs->Open(projectFilePath.c_str(), "r");
+  if (!fp) {
+    Trace::Error("PERSISTENCYSERVICE: Could not open project file: %s",
+                 projectFilePath.c_str());
     return PERSIST_LOAD_FAILED;
+  }
 
-  bool elem = doc.FirstChild(); // advance to first child
+  size_t total = 0;
+  while (total < sizeof(loadBuffer_)) {
+    int n = fp->Read(loadBuffer_ + total,
+                     (int)(sizeof(loadBuffer_) - total));
+    if (n <= 0) {
+      break;
+    }
+    total += (size_t)n;
+    if (n < (int)(sizeof(loadBuffer_) - total)) {
+      // Short read == EOF on a read-only handle.
+      break;
+    }
+  }
+
+  if (total == 0) {
+    Trace::Error("PERSISTENCYSERVICE: Project file is empty: %s",
+                 projectFilePath.c_str());
+    return PERSIST_LOAD_FAILED;
+  }
+
+  if (total == sizeof(loadBuffer_)) {
+    Trace::Error("PERSISTENCYSERVICE: Project file too large (>%d bytes): %s",
+                 MAX_PROJECT_FILE_SIZE, projectFilePath.c_str());
+    return PERSIST_LOAD_FAILED;
+  }
+
+  return LoadFromBuffer(loadBuffer_, total);
+};
+
+PersistencyResult
+PersistencyService::LoadFromBuffer(const uint8_t *data, size_t len) {
+  PersistencyDocument doc;
+  if (!doc.LoadFromBuffer(data, len)) {
+    return PERSIST_LOAD_FAILED;
+  }
+
+  bool elem = doc.FirstChild();
   if (!elem || strcmp(doc.ElemName(), "PICOTRACKER")) {
     Trace::Error("could not find master node");
     return PERSIST_LOAD_FAILED;
@@ -319,11 +361,11 @@ PersistencyResult PersistencyService::Load(const char *projectName) {
     elem = doc.NextSibling();
   }
   if (doc.HadError()) {
-    Trace::Error("XML errors detected while loading project '%s'", projectName);
+    Trace::Error("XML errors detected while loading project from buffer");
     return PERSIST_LOAD_FAILED;
   }
   return PERSIST_LOADED;
-};
+}
 
 PersistencyResult
 PersistencyService::LoadCurrentProjectName(char *projectName) {

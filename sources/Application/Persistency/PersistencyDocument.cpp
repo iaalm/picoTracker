@@ -8,6 +8,7 @@
  */
 
 #include "PersistencyDocument.h"
+#include "MemoryFile.h"
 #include "System/Console/Trace.h"
 #include "System/Console/nanoprintf.h"
 
@@ -270,6 +271,11 @@ bool PersistencyDocument::LoadFromBuffer(const uint8_t *data, size_t len) {
   yxml_init(state_, stack_, sizeof(stack_));
   r_ = YXML_OK;
 
+  // Validation pass: drive the parser through every byte so malformed
+  // input (R4) surfaces here as a non-OK yxml_ret_t. After this loop
+  // runs cleanly, the buffer is well-formed enough to be re-played by
+  // the iteration methods (FirstChild/NextSibling/...) which read from
+  // fp_ one byte at a time.
   for (size_t i = 0; i < len; ++i) {
     r_ = yxml_parse(state_, data[i]);
     if (r_ < YXML_OK) {
@@ -278,6 +284,22 @@ bool PersistencyDocument::LoadFromBuffer(const uint8_t *data, size_t len) {
       return false;
     }
   }
+
+  // Reset parser state so the iteration methods re-parse from byte 0
+  // through the MemoryFile we install as fp_ below.
+  yxml_init(state_, stack_, sizeof(stack_));
+  r_ = YXML_OK;
+
+  // Install a MemoryFile so the existing fp_->GetC()-driven iteration
+  // methods can consume the same buffer without code changes. This is
+  // the Option A seam from the task brief. The MemoryFile is embedded
+  // as a member (see PersistencyDocument.h) so no heap allocation is
+  // needed — important on RP2040 where operator new is disabled.
+  memory_fp_.Init(data, len);
+  fp_ = FileHandle(&memory_fp_);
+
+  Trace::Log("PERSISTENCYDOCUMENT",
+             "Successfully staged %zu bytes from buffer", len);
   return true;
 }
 
