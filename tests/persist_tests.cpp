@@ -7,6 +7,7 @@
 #include "Application/Persistency/PersistencyDocument.h"
 #include "Application/Persistency/PersistencyService.h"
 #include "doctest/doctest.h"
+#include "helpers/load_buffer.h"
 #include <cstring>
 
 TEST_CASE("R4: PersistencyDocument rejects corrupted bytes") {
@@ -109,4 +110,31 @@ TEST_CASE("R2: instrument NAMES match legacy FourCC c_str() spellings "
   checkNamesMatchSpecs<MidiInstrument>(
       "MidiInstrument", MidiInstrument::SPECS, MidiInstrument::NAMES,
       MidiInstrument::kParamCount);
+}
+
+TEST_CASE("R3: real .pti (lgpt_CTX2) parses + has expected instruments") {
+  const std::vector<uint8_t> data =
+      LoadFileOrSkip(TEST_FIXTURE_PATH "/lgptsav.dat");
+  if (data.empty()) {
+    MESSAGE("R3 skipped: fixture missing at " TEST_FIXTURE_PATH
+            "/lgptsav.dat (test_root/ not present locally)");
+    return;
+  }
+
+  PersistencyDocument doc;
+  REQUIRE(doc.LoadFromBuffer(data.data(), data.size()) == true);
+  CHECK(doc.HadError() == false);
+
+  // Quick structural check: the buffer should mention <INSTRUMENT
+  // (we count opens to know roughly how many instruments the file has).
+  std::string s(reinterpret_cast<const char *>(data.data()), data.size());
+  int instOpens = 0;
+  size_t pos = 0;
+  const std::string needle = "<INSTRUMENT ";
+  while ((pos = s.find(needle, pos)) != std::string::npos) {
+    ++instOpens;
+    pos += needle.size();
+  }
+  CHECK(instOpens > 0);
+  CHECK(instOpens <= 64);  // sanity: project instruments are bounded
 }
