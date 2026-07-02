@@ -22,9 +22,12 @@
 //
 // MemoryFile is ONLY constructed on the buffer path; the production
 // Load(filename) path uses fs->Open(...) which yields a FileHandle
-// backed by the real FS, never MemoryFile. So the vtable cost is paid
-// only on the host test side and on the SaveToBuffer -> LoadFromBuffer
-// round-trip — not on the RP2040 hot path.
+// backed by the real FS, never MemoryFile. So the vtable dispatch
+// through MemoryFile happens only on the host test side and on the
+// SaveToBuffer -> LoadFromBuffer round-trip. On the RP2040 hot path
+// the firmware never *calls* through the MemoryFile vtable — but every
+// PersistencyDocument instance still carries the vtable pointer as
+// value-member overhead (~8 B on RP2040).
 //
 // Storage model: MemoryFile is always embedded as a value member of
 // PersistencyDocument (or another stack/static owner). Dispose() is a

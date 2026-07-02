@@ -184,14 +184,13 @@ public:
   virtual void RestoreContent(PersistencyDocument *doc) override;
 
   // Linear search for a parameter by its display/persistence name. Used by
-  // RestoreContent and by callers that hold a string name and want to map it
-  // to a parameter index. For ≤ 36 params this is faster than building a
-  // hash table. Returns -1 when the name is not in this instrument's spec
-  // table. Public so persistence tests can round-trip NAMES without needing
-  // a subclass friend.
+  // RestoreContent and (via a test friend) by host tests that want to
+  // round-trip NAMES without instantiating an instrument. For ≤ 36 params
+  // this is faster than building a hash table. Returns -1 when the name is
+  // not in this instrument's spec table.
+protected:
   int FindParamByName(const char *name) const;
 
-protected:
   // Format a parameter value at idx into a persistence-friendly string.
   // For legacy (stage 0.5) instruments this delegates to the bound
   // Variable::GetString() to preserve the on-disk format; for migrated
