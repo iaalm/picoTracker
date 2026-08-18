@@ -252,3 +252,96 @@ TEST_CASE("S4: a silent voice stops reporting itself active") {
     CHECK_FALSE(v.IsActive());
   }
 }
+
+// ---------------------------------------------------------------------------
+// Envelope times must span the documented 2 ms .. 6 s range.
+//
+// The rate table computed `0.002f * powf(3000, i/15) / 1000.0f`, but 0.002 is
+// already in seconds — the trailing /1000 shrank the whole curve by 1000x, so
+// the slowest envelope ran 6 ms instead of 6 s and nibbles 0-5 all saturated
+// at one sample per step. Every ADSR control was effectively inert and every
+// note was a click.
+//
+// Fixing the scale alone is not enough: at 44.1 kHz a 6 s sweep needs a
+// per-sample step of 0.25, which truncates to 0 in a 16-bit accumulator (and
+// clamping it to 1 pins everything slower than ~1.5 s to that same time).
+// Hence the Q8 envelope domain.
+// ---------------------------------------------------------------------------
+namespace {
+
+// Time for the attack stage to reach full level, in milliseconds.
+double attackMs(uint8_t attackNibble) {
+  SynthVoice::InitTables();
+  VoiceParams p = basePatch();
+  p.op1_ad = (uint8_t)(attackNibble << 4); // attack=n, decay=0
+  p.op1_sr = 0xF0;                         // sustain F, release 0
+  p.filt_ad = (uint8_t)(attackNibble << 4);
+  p.filt_sr = 0xF0;
+
+  SynthVoice v;
+  v.Reset();
+  v.Trigger(p, SynthVoice::NoteToInc(60), 60, 0x7F, true);
+
+  std::vector<fixed> buf(2);
+  int samples = 0;
+  const int kLimit = 30 * kSampleRate; // generous ceiling
+  while (samples < kLimit && v.op1_env_stage == ENV_ATTACK) {
+    v.RenderBlock(buf.data(), 1);
+    samples++;
+  }
+  return 1000.0 * samples / kSampleRate;
+}
+
+} // namespace
+
+TEST_CASE("S5: envelope times span roughly 2ms to 6s") {
+  // Endpoints, to within the resolution of the rate table.
+  CHECK(attackMs(0x0) == doctest::Approx(2.0).epsilon(0.30));
+  CHECK(attackMs(0xF) == doctest::Approx(6000.0).epsilon(0.05));
+
+  // Every step must be meaningfully slower than the one before it. This is
+  // what actually failed before: the fast half of the range collapsed onto
+  // "one sample" and the slow half onto a single ~1.5 s time, so most
+  // neighbouring nibbles were indistinguishable.
+  double prev = attackMs(0x0);
+  for (int n = 1; n < 16; n++) {
+    const double cur = attackMs((uint8_t)n);
+    INFO("nibble ", n, ": ", cur, " ms, previous ", prev, " ms");
+    CHECK(cur > prev * 1.25);
+    prev = cur;
+  }
+}
+
+TEST_CASE("S5b: release times span the same range") {
+  SynthVoice::InitTables();
+  std::vector<fixed> buf(2);
+
+  auto releaseMs = [&](uint8_t releaseNibble) {
+    VoiceParams p = basePatch();
+    p.op1_sr = (uint8_t)(0xF0 | releaseNibble); // sustain F
+    p.op2_sr = p.op1_sr;
+    p.op3_sr = p.op1_sr;
+    p.filt_sr = p.op1_sr;
+
+    SynthVoice v;
+    v.Reset();
+    v.Trigger(p, SynthVoice::NoteToInc(60), 60, 0x7F, true);
+    for (int i = 0; i < 2000; i++) { // settle into sustain
+      v.RenderBlock(buf.data(), 1);
+    }
+    v.Release();
+
+    int samples = 0;
+    const int kLimit = 30 * kSampleRate;
+    while (samples < kLimit && v.IsActive()) {
+      v.RenderBlock(buf.data(), 1);
+      samples++;
+    }
+    return 1000.0 * samples / kSampleRate;
+  };
+
+  CHECK(releaseMs(0x0) == doctest::Approx(2.0).epsilon(0.30));
+  CHECK(releaseMs(0xF) == doctest::Approx(6000.0).epsilon(0.05));
+  // A long release must outlast a short one by orders of magnitude.
+  CHECK(releaseMs(0xF) > releaseMs(0x0) * 100.0);
+}

@@ -41,10 +41,20 @@ constexpr int kFBShift = 19;
 // Final output headroom shift applied before clipping to int16.
 constexpr int kOutShift = 0;
 
+// Envelope levels carry kEnvFracBits of extra fractional precision.
+//
+// A 6 second sweep at 44.1 kHz needs a per-sample step of 65535/264600 =
+// 0.25. In a plain 16-bit accumulator that truncates to 0, and clamping it up
+// to 1 pins every slow envelope to the same ~1.5 s — which is why the whole
+// top half of the range used to sound identical. Eight fractional bits keep
+// the full 2 ms .. 6 s span within 0.6%.
+constexpr int kEnvFracBits = 8;
+constexpr uint32_t kEnvMax = (uint32_t)0xFFFF << kEnvFracBits;
+
 // Lookup tables -------------------------------------------------------------
 int16_t sineTable[kSineSize];
 uint32_t noteInc[128];   // phase increment (Q32) per MIDI note
-uint16_t envRate[16];    // envelope level delta per sample
+uint32_t envRate[16];    // envelope level delta per sample (Q<kEnvFracBits>)
 int32_t cutoffCoef[256]; // SVF frequency coefficient f (Q15)
 int32_t resoCoef[16];    // SVF damping coefficient q1 (Q15)
 bool tablesReady = false;
@@ -89,26 +99,27 @@ inline int32_t osc(uint32_t phase, uint8_t wave, uint16_t pw,
   }
 }
 
-// Advance an ADSR envelope one sample. Returns the new level.
-inline uint16_t advanceEnv(uint8_t &stage, uint16_t level, uint8_t ad,
+// Advance an ADSR envelope one sample. Level is Q<kEnvFracBits>.
+inline uint32_t advanceEnv(uint8_t &stage, uint32_t level, uint8_t ad,
                            uint8_t sr) {
   uint8_t attack = ad >> 4;
   uint8_t decay = ad & 0xF;
   uint8_t sustain = sr >> 4;
   uint8_t release = sr & 0xF;
-  uint16_t susLevel = (uint16_t)sustain * 0x1111;
-  int32_t l = level;
+  uint32_t susLevel = (uint32_t)(sustain * 0x1111) << kEnvFracBits;
+  // kEnvMax * 2 still fits int32, so no 64-bit math on the audio path.
+  int32_t l = (int32_t)level;
   switch (stage) {
   case ENV_ATTACK:
     l += envRate[attack];
-    if (l >= 0xFFFF) {
-      l = 0xFFFF;
+    if (l >= (int32_t)kEnvMax) {
+      l = kEnvMax;
       stage = ENV_DECAY;
     }
     break;
   case ENV_DECAY:
     l -= envRate[decay];
-    if (l <= susLevel) {
+    if (l <= (int32_t)susLevel) {
       l = susLevel;
       stage = ENV_SUSTAIN;
     }
@@ -127,19 +138,20 @@ inline uint16_t advanceEnv(uint8_t &stage, uint16_t level, uint8_t ad,
     l = 0;
     break;
   }
-  return (uint16_t)l;
+  return (uint32_t)l;
 }
 
 // Advance the AD-only pitch envelope (attack to full, decay back to 0).
-inline uint16_t advancePitchEnv(uint8_t &stage, uint16_t level, uint8_t ad) {
+// Level is Q<kEnvFracBits>, same domain as advanceEnv.
+inline uint32_t advancePitchEnv(uint8_t &stage, uint32_t level, uint8_t ad) {
   uint8_t attack = ad >> 4;
   uint8_t decay = ad & 0xF;
-  int32_t l = level;
+  int32_t l = (int32_t)level;
   switch (stage) {
   case ENV_ATTACK:
     l += envRate[attack];
-    if (l >= 0xFFFF) {
-      l = 0xFFFF;
+    if (l >= (int32_t)kEnvMax) {
+      l = kEnvMax;
       stage = ENV_DECAY;
     }
     break;
@@ -154,7 +166,7 @@ inline uint16_t advancePitchEnv(uint8_t &stage, uint16_t level, uint8_t ad) {
     l = 0;
     break;
   }
-  return (uint16_t)l;
+  return (uint32_t)l;
 }
 
 // LFO value in [-32768, 32767] for a given phase.
@@ -196,11 +208,16 @@ void SynthVoice::InitTables() {
   }
 
   // Envelope rates: nibble 0 = ~2ms, nibble 15 = ~6s (exponential).
+  //
+  // 0.002 is already in seconds, so the old trailing /1000 scaled the whole
+  // curve down by 1000x: the slowest envelope was 6ms rather than 6s, and
+  // nibbles 0-5 all saturated at "one sample" — every ADSR control was
+  // effectively inert.
   for (int i = 0; i < 16; i++) {
-    float seconds = 0.002f * powf(6000.0f / 2.0f, i / 15.0f) / 1000.0f;
+    float seconds = 0.002f * powf(6000.0f / 2.0f, i / 15.0f);
     float samples = seconds * kSampleRate;
-    int rate = (int)(65535.0f / samples);
-    envRate[i] = (uint16_t)clampInt(rate, 1, 65535);
+    double rate = (double)kEnvMax / samples;
+    envRate[i] = (uint32_t)clampInt((int32_t)rate, 1, (int32_t)kEnvMax);
   }
 
   // SVF cutoff coefficient table (exponential 20Hz .. fs/6), f = 2*sin(pi*fc/fs)
@@ -288,7 +305,7 @@ bool SynthVoice::IsActive() const {
   // pluck or percussive sound) decays to level 0 and then sits in
   // ENV_SUSTAIN indefinitely. Treating that as active kept the voice
   // rendering silence forever whenever a gate-off never arrived.
-  auto silent = [](uint8_t stage, uint16_t level) {
+  auto silent = [](uint8_t stage, uint32_t level) {
     return stage == ENV_OFF || (stage == ENV_SUSTAIN && level == 0);
   };
   return !(silent(op1_env_stage, op1_env_level) &&
@@ -362,7 +379,8 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
 
     // --- pitch modulation -> increment multiplier (Q16) ---
     // pitch env (semitones) + lfo (if targeting pitch)
-    float semis = (p.pitch_depth * (pitch_env_level / 65535.0f));
+    float semis =
+        (p.pitch_depth * ((pitch_env_level >> kEnvFracBits) / 65535.0f));
     if (p.lfo_target == SYNTH_LFO_TGT_PITCH) {
       semis += (lfoScaled / 32768.0f) * 2.0f; // up to ~2 semitones
     }
@@ -381,6 +399,12 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
     filt_env_level =
         advanceEnv(filt_env_stage, filt_env_level, p.filt_ad, p.filt_sr);
 
+    // Envelope levels are Q<kEnvFracBits>; narrow to the 0..0xFFFF amplitude
+    // before mixing so the products below keep their original 32-bit range.
+    const uint32_t env1 = op1_env_level >> kEnvFracBits;
+    const uint32_t env2 = op2_env_level >> kEnvFracBits;
+    const uint32_t env3 = op3_env_level >> kEnvFracBits;
+
     // --- feedback phase mod (applied to feedback_op) ---
     int32_t fbAvg = (fb_history[0] + fb_history[1]) >> 1;
     int32_t fbPhase = p.feedback ? (fbAvg * p.feedback) << (kFBShift - 8) : 0;
@@ -398,7 +422,7 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
     // --- compute operators (op3 first since it is always a modulator/source) ---
     int32_t fb3 = (p.feedback_op == 2) ? fbPhase : 0;
     int32_t o3raw = osc(op3_phase + fb3, p.op3_wave, 0, noise_state);
-    int32_t o3 = (o3raw * op3_env_level) >> 16;       // post-env
+    int32_t o3 = (o3raw * (int32_t)env3) >> 16;       // post-env
     int32_t o3out = (o3 * p.op3_level) >> 8;          // post-level
 
     int32_t mod3 = ((int64_t)o3out * ((1 << kFMShift) + fmLfo)) >> 8;
@@ -410,7 +434,7 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
       mod2in = mod3; // 3->2
     int32_t o2raw =
         osc(op2_phase + fb2 + (uint32_t)mod2in, p.op2_wave, 0, noise_state);
-    int32_t o2 = (o2raw * op2_env_level) >> 16;
+    int32_t o2 = (o2raw * (int32_t)env2) >> 16;
     int32_t o2out = (o2 * p.op2_level) >> 8;
     int32_t mod2 = ((int64_t)o2out * ((1 << kFMShift) + fmLfo)) >> 8;
 
@@ -440,7 +464,7 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
     }
     int32_t o1raw =
         osc(op1_phase + fb1 + (uint32_t)mod1in, p.op1_wave, pw, noise_state);
-    int32_t o1 = (o1raw * op1_env_level) >> 16;
+    int32_t o1 = (o1raw * (int32_t)env1) >> 16;
     int32_t o1out = (o1 * p.op1_level) >> 8;
 
     // feedback history is taken from the feedback operator's pre-level output
@@ -476,7 +500,7 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
     // sub oscillator: one octave below op1, from its own half-rate phase
     if (subLevel) {
       int32_t subRaw = osc(sub_phase, SYNTH_WAVE_SINE, 0, noise_state);
-      mix += ((subRaw * op1_env_level) >> 16) * subLevel >> 8;
+      mix += ((subRaw * (int32_t)env1) >> 16) * subLevel >> 8;
     }
 
     // --- state variable filter ---
@@ -486,7 +510,9 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
       cutoffIdx += ((note - 60) * p.filt_keytrack) >> 4;
     // filter envelope modulation
     if (p.filt_env_depth)
-      cutoffIdx += (p.filt_env_depth * (filt_env_level >> 8)) >> 8;
+      cutoffIdx += (p.filt_env_depth *
+                    (int32_t)((filt_env_level >> kEnvFracBits) >> 8)) >>
+                   8;
     // lfo -> cutoff
     if (p.lfo_target == SYNTH_LFO_TGT_CUTOFF)
       cutoffIdx += lfoScaled >> 9;

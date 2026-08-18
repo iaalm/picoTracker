@@ -136,15 +136,18 @@ struct SynthVoice {
   uint32_t noise_state; // 23-bit LFSR
 
   // --- operator envelopes ---
-  uint16_t op1_env_level, op2_env_level, op3_env_level;
+  // Levels are Q8: the low 8 bits are fractional headroom, without which a
+  // multi-second envelope's per-sample step truncates to zero. Consumers
+  // shift down by kEnvFracBits to get the 0..0xFFFF amplitude.
+  uint32_t op1_env_level, op2_env_level, op3_env_level;
   uint8_t op1_env_stage, op2_env_stage, op3_env_stage;
 
   // --- filter envelope ---
-  uint16_t filt_env_level;
+  uint32_t filt_env_level;
   uint8_t filt_env_stage;
 
   // --- pitch envelope (AD only) ---
-  uint16_t pitch_env_level;
+  uint32_t pitch_env_level;
   uint8_t pitch_env_stage;
 
   // --- state variable filter ---
