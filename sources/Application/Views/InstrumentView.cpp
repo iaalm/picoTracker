@@ -253,6 +253,18 @@ void InstrumentView::refreshInstrumentFields() {
   for (auto &f : sampleActionField_) {
     f.RemoveObserver(*this);
   }
+  for (auto &f : paramIntVarField_) {
+    f.RemoveObserver(*this);
+  }
+  for (auto &f : paramBigHexVarField_) {
+    f.RemoveObserver(*this);
+  }
+  for (auto &f : paramIntVarOffField_) {
+    f.RemoveObserver(*this);
+  }
+  for (auto &f : paramBitmaskVarField_) {
+    f.RemoveObserver(*this);
+  }
 
   fieldList_.clear();
   intVarField_.clear();
@@ -262,6 +274,15 @@ void InstrumentView::refreshInstrumentFields() {
   intVarOffField_.clear();
   sampleActionField_.clear();
   bitmaskVarField_.clear();
+  // The packed-parameter field vectors are storage for the pointers held in
+  // fieldList_. Leaving them populated across a refresh both leaks capacity
+  // (fillSynthParameters alone uses 31 of paramIntVarField_'s 40 slots, so a
+  // second refresh overruns it) and invalidates every pointer fieldList_
+  // already holds.
+  paramIntVarField_.clear();
+  paramBigHexVarField_.clear();
+  paramIntVarOffField_.clear();
+  paramBitmaskVarField_.clear();
   nameTextField_.clear();
   nameVariables_.clear();
   lastSampleIndex_ = -1;
@@ -337,6 +358,18 @@ void InstrumentView::refreshInstrumentFields() {
     f.AddObserver(*this);
   }
   for (auto &f : bitmaskVarField_) {
+    f.AddObserver(*this);
+  }
+  for (auto &f : paramIntVarField_) {
+    f.AddObserver(*this);
+  }
+  for (auto &f : paramBigHexVarField_) {
+    f.AddObserver(*this);
+  }
+  for (auto &f : paramIntVarOffField_) {
+    f.AddObserver(*this);
+  }
+  for (auto &f : paramBitmaskVarField_) {
     f.AddObserver(*this);
   }
 

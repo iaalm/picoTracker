@@ -19,12 +19,27 @@ void UIParamIntVarField::WriteInt(int v) {
 }
 
 etl::string<MAX_VARIABLE_STRING_LENGTH> UIParamIntVarField::ReadString() const {
-  // Packed-storage parameters are stored as int32 in the ParamSpec model.
-  // Serialisation formats them via GetParamFormat(i) at the call sites that
-  // need a printf template (Draw, SaveContent, etc.).
+  // CHAR_LIST / BOOL parameters render as their label; Draw passes the result
+  // to a "%s" format. Everything else is plain decimal.
+  if (instr_) {
+    const char *label = instr_->GetParamLabel(idx_);
+    if (label) {
+      return etl::string<MAX_VARIABLE_STRING_LENGTH>(label);
+    }
+  }
   char buf[16];
   npf_snprintf(buf, sizeof(buf), "%d", ReadInt());
   return etl::string<MAX_VARIABLE_STRING_LENGTH>(buf);
+}
+
+Variable::Type UIParamIntVarField::ReadType() const {
+  if (instr_ && instr_->IsParamStringTyped(idx_)) {
+    // CHAR_LIST and BOOL both take Draw's string branch, which calls
+    // ReadString(). CHAR_LIST additionally renders a negative value as
+    // "NONE", which is what the "off" sentinel fields want.
+    return Variable::CHAR_LIST;
+  }
+  return Variable::INT;
 }
 
 bool UIParamIntVarField::ReadIsModified() const {

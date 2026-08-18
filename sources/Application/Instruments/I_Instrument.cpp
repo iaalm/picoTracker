@@ -69,7 +69,7 @@ void I_Instrument::SaveContent(tinyxml2::XMLPrinter *printer) {
   for (int idx = 0; idx < count; idx++) {
     printer->OpenElement("PARAM");
     printer->PushAttribute("NAME", GetParamName(idx));
-    Variable *v = vars ? (*vars)[idx] : nullptr;
+    Variable *v = (vars && idx < (int)vars->size()) ? (*vars)[idx] : nullptr;
     if (v) {
       // Legacy path: preserve the exact existing on-disk format.
       printer->PushAttribute("VALUE", v->GetString().c_str());
@@ -126,13 +126,15 @@ void I_Instrument::RestoreContent(PersistencyDocument *doc) {
           // handling (BOOL -> "true"/"false", CHAR_LIST -> list lookup).
           // For migrated instruments the storage path is null and we
           // parse the value via SetParamValue.
-          Variable *v = Variables() ? (*Variables())[idx] : nullptr;
+          const etl::ivector<Variable *> *vars = Variables();
+          Variable *v =
+              (vars && idx < (int)vars->size()) ? (*vars)[idx] : nullptr;
           if (v) {
             v->SetString(value);
             SetChanged();
             NotifyObservers();
           } else {
-            SetParamValue(idx, atoi(value));
+            SetParamValue(idx, ParseParamValue(idx, value));
           }
           paramCount++;
         } else {
@@ -167,10 +169,92 @@ int I_Instrument::FindParamByName(const char *name) const {
   return -1;
 }
 
+int I_Instrument::ParseFromList(const char *value, const char *const *labels,
+                                int count, int fallback) {
+  if (!value || !labels) {
+    return fallback;
+  }
+  for (int i = 0; i < count; i++) {
+    if (labels[i] && !strcasecmp(value, labels[i])) {
+      return i;
+    }
+  }
+  return fallback;
+}
+
+const I_Instrument::StringParam *I_Instrument::FindStringParam(int idx) const {
+  int count = 0;
+  const StringParam *table = StringParams(count);
+  if (!table) {
+    return nullptr;
+  }
+  for (int i = 0; i < count; i++) {
+    if (table[i].idx == idx) {
+      return &table[i];
+    }
+  }
+  return nullptr;
+}
+
+const char *I_Instrument::GetParamLabel(int idx) const {
+  const StringParam *sp = FindStringParam(idx);
+  if (!sp) {
+    return nullptr;
+  }
+  int v = GetParamValue(idx);
+  if (!sp->labels) {
+    return v ? "true" : "false"; // BOOL
+  }
+  if (v < 0 || v >= sp->count || !sp->labels[v]) {
+    // Out-of-range index: return a marker rather than nullptr so callers
+    // formatting with "%s" always have a valid string to print.
+    return "?";
+  }
+  return sp->labels[v];
+}
+
+int I_Instrument::ParseParamValue(int idx, const char *value) const {
+  if (!value) {
+    return 0;
+  }
+  const StringParam *sp = FindStringParam(idx);
+  if (sp && sp->labels) {
+    // CHAR_LIST: map the word back to its index. Fall through to atoi when
+    // the file already holds a number (values written by the packed path).
+    int fallback = (value[0] >= '0' && value[0] <= '9') ? atoi(value) : 0;
+    return ParseFromList(value, sp->labels, sp->count, fallback);
+  }
+  // BOOL parameters, and the legacy BOOL spelling generally: Variable::
+  // SetString treated anything other than "false" as true. Only apply that
+  // when the value actually looks boolean, so numeric params are unaffected.
+  if (!strcasecmp(value, "false")) {
+    return 0;
+  }
+  if (!strcasecmp(value, "true")) {
+    return 1;
+  }
+  return atoi(value);
+}
+
 const char *I_Instrument::FormatParamValue(int idx, char *buf,
                                            size_t bufsize) const {
   if (!buf || bufsize == 0) {
     return "";
+  }
+  // Parameters that legacy .pti files store as words must be written back
+  // the same way, otherwise a single load/save cycle rewrites every project
+  // into a form older firmware reads as 0.
+  const StringParam *sp = FindStringParam(idx);
+  if (sp) {
+    int v = GetParamValue(idx);
+    if (!sp->labels) {
+      npf_snprintf(buf, bufsize, "%s", v ? "true" : "false");
+      return buf;
+    }
+    if (v >= 0 && v < sp->count && sp->labels[v]) {
+      npf_snprintf(buf, bufsize, "%s", sp->labels[v]);
+      return buf;
+    }
   }
   // Static storage for the formatted string. Returned by const-pointer so
   // tinyxml2::XMLPrinter can copy it; safe because SaveContent copies each

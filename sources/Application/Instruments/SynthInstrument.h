@@ -124,6 +124,12 @@ public:
   virtual void ResetParam(int idx) override;
   virtual void ResetAllParams() override;
 
+protected:
+  // Waveform / algorithm / filter-mode / LFO lists and the BOOL toggles. Used
+  // both by persistence (so .pti keeps the legacy word spelling) and by the
+  // UI, whose fields for these params format with "%s".
+  const StringParam *StringParams(int &count) const override;
+
 private:
   // Build a VoiceParams snapshot from the current packed-array values.
   void buildParams(VoiceParams &p);

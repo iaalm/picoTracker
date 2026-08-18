@@ -58,8 +58,8 @@ const ParamSpec SynthInstrument::SPECS[SynthInstrument::kParamCount] = {
     {FourCC::SynthInstrumentOp2Wave, 0, 8, 1, 0, 0, 3, 1, 1, 0, 0},
     // [9] Op2Ratio
     {FourCC::SynthInstrumentOp2Ratio, 0, 9, 1, 1, 0, 255, 1, 1, 0, 0},
-    // [10] Op2Detune (signed -64..63, stored as int32)
-    {FourCC::SynthInstrumentOp2Detune, 0, 10, 1, 0, 0, 0xFFFF, 1, 4, 0, 0},
+    // [10] Op2Detune (signed cents; DSP reads it as int8_t)
+    {FourCC::SynthInstrumentOp2Detune, 0, 10, 1, 0, -64, 63, 1, 4, 0, 0},
     // [11] Op2Level
     {FourCC::SynthInstrumentOp2Level, 0, 11, 1, 0, 0, 0xFF, 1, 0x10, 0, 0},
     // [12] Op2ADSR
@@ -68,8 +68,8 @@ const ParamSpec SynthInstrument::SPECS[SynthInstrument::kParamCount] = {
     {FourCC::SynthInstrumentOp3Wave, 0, 13, 1, 0, 0, 3, 1, 1, 0, 0},
     // [14] Op3Ratio
     {FourCC::SynthInstrumentOp3Ratio, 0, 14, 1, 1, 0, 255, 1, 1, 0, 0},
-    // [15] Op3Detune (signed -64..63, stored as int32)
-    {FourCC::SynthInstrumentOp3Detune, 0, 15, 1, 0, 0, 0xFFFF, 1, 4, 0, 0},
+    // [15] Op3Detune (signed cents; DSP reads it as int8_t)
+    {FourCC::SynthInstrumentOp3Detune, 0, 15, 1, 0, -64, 63, 1, 4, 0, 0},
     // [16] Op3Level
     {FourCC::SynthInstrumentOp3Level, 0, 16, 1, 0, 0, 0xFF, 1, 0x10, 0, 0},
     // [17] Op3ADSR
@@ -82,12 +82,12 @@ const ParamSpec SynthInstrument::SPECS[SynthInstrument::kParamCount] = {
     {FourCC::SynthInstrumentFilterMode, 0, 20, 1, 0, 0, SYNTH_FLT_LAST - 1, 1, 1, 0, 0},
     // [21] FilterKeytrack
     {FourCC::SynthInstrumentFilterKeytrack, 0, 21, 1, 0, 0, 0xF, 1, 1, 0, 0},
-    // [22] FilterEnvDepth (signed -128..127, stored as int32)
-    {FourCC::SynthInstrumentFilterEnvDepth, 0, 22, 1, 0, 0, 0xFFFF, 1, 8, 0, 0},
+    // [22] FilterEnvDepth (signed; negative = envelope closes the filter)
+    {FourCC::SynthInstrumentFilterEnvDepth, 0, 22, 1, 0, -128, 127, 1, 8, 0, 0},
     // [23] FilterADSR
     {FourCC::SynthInstrumentFilterADSR, 0, 23, 1, 0x00F8, 0, 0xFFFF, 1, 1, 0, 0},
-    // [24] PitchDepth (signed -128..127)
-    {FourCC::SynthInstrumentPitchDepth, 0, 24, 1, 0, 0, 0xFFFF, 1, 8, 0, 0},
+    // [24] PitchDepth (signed semitones; negative = downward sweep)
+    {FourCC::SynthInstrumentPitchDepth, 0, 24, 1, 0, -128, 127, 1, 8, 0, 0},
     // [25] PitchAD
     {FourCC::SynthInstrumentPitchAD, 0, 25, 1, 0, 0, 0xFF, 1, 1, 0, 0},
     // [26] LFORate
@@ -110,8 +110,9 @@ const ParamSpec SynthInstrument::SPECS[SynthInstrument::kParamCount] = {
     {FourCC::SynthInstrumentSubLevel, 0, 34, 1, 0, 0, 0xFF, 1, 0x10, 0, 0},
     // [35] Volume
     {FourCC::SynthInstrumentVolume, 0, 35, 1, 0xC0, 0, 0xFF, 1, 0x10, 0, 0},
-    // [36] Table (default -1 == "no table bound")
-    {FourCC::SynthInstrumentTable, 0, 36, 1, -1, 0, 0x7F, 1, 0x10, 0, 0},
+    // [36] Table (default/min -1 == "no table bound"; min must admit the
+    // sentinel or SetParamValue clamps every unbound table to 0)
+    {FourCC::SynthInstrumentTable, 0, 36, 1, -1, -1, 0x7F, 1, 0x10, 0, 0},
     // [37] TableAutomation (bool)
     {FourCC::SynthInstrumentTableAutomation, 0, 37, 1, 0, 0, 1, 1, 1, 0, 0},
 };
@@ -354,6 +355,26 @@ int SynthInstrument::GetParamBigStep(int idx) const {
     return 1;
   }
   return SPECS[idx].big_step;
+}
+
+const I_Instrument::StringParam *
+SynthInstrument::StringParams(int &count) const {
+  // Counts mirror the pre-packed-storage Variable constructors: op2/op3
+  // cannot select noise, so they expose 4 entries rather than SYNTH_WAVE_LAST.
+  static const StringParam kStringParams[] = {
+      {PARAM_ALGORITHM, synthAlgorithmNames, 5},
+      {PARAM_OP1_WAVE, synthWaveNames, SYNTH_WAVE_LAST},
+      {PARAM_OP2_WAVE, synthWaveNames, 4},
+      {PARAM_OP3_WAVE, synthWaveNames, 4},
+      {PARAM_FLT_MODE, synthFilterModeNames, SYNTH_FLT_LAST},
+      {PARAM_LFO_SHAPE, synthLFOShapeNames, SYNTH_LFO_LAST},
+      {PARAM_LFO_TARGET, synthLFOTargetNames, SYNTH_LFO_TGT_LAST},
+      {PARAM_HARD_SYNC, nullptr, 0},   // BOOL
+      {PARAM_RING_MOD, nullptr, 0},    // BOOL
+      {PARAM_TABLE_AUTO, nullptr, 0},  // BOOL
+  };
+  count = sizeof(kStringParams) / sizeof(kStringParams[0]);
+  return kStringParams;
 }
 
 void SynthInstrument::SetParamValue(int idx, int v) {

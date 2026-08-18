@@ -136,28 +136,16 @@ void checkSpecsAndFormats(const char *label, const ParamSpec *specs,
     REQUIRE(formats[i][0] != '\0');
     CHECK(formats[i][0] == '%');
 
-    // default_ invariant: either a real value in [min, max] OR the
-    // -1 sentinel for "table unbound" / "program unbound" / similar.
+    // default_ invariant: the default must be reachable, i.e. in [min, max].
     //
-    // NB: there are TWO different SPECS conventions in the codebase for
-    // the same concept — the sentinel is not symmetric:
-    //   (a) SampleInstrument / SynthInstrument: min=0, max=0x7F, default=-1
-    //       — the user can only pick 0..0x7F; default -1 means "no
-    //       table bound"; persists as -1 on disk
-    //   (b) MidiInstrument: min=-1, max=0x7F, default=-1
-    //       — the user CAN pick -1 explicitly; -1 is a real choice
-    // Both are accepted here. The convention inconsistency is a known
-    // design smell (pre-existed the v1 refactor); see R2b follow-up in
-    // the SDD ledger.
-    //
-    // doctest's CHECK macro has a static_assert on expression complexity,
-    // so we branch and emit at most one CHECK per slot.
-    if (specs[i].default_ == -1) {
-      // Sentinel: any (min, max) shape is accepted by design.
-    } else {
-      CHECK(specs[i].default_ >= specs[i].min);
-      CHECK(specs[i].default_ <= specs[i].max);
-    }
+    // This previously accepted `default_ == -1` with min=0 as a second,
+    // equally-valid convention. It is not valid: SetParamValue clamps every
+    // write to [min, max], so with min=0 a project storing table="-1" (the
+    // "no table bound" sentinel, and by far the most common value on disk)
+    // clamps to 0 and silently binds the instrument to table 0.
+    // MidiInstrument already used min=-1; Sample/SID/Synth now match.
+    CHECK(specs[i].default_ >= specs[i].min);
+    CHECK(specs[i].default_ <= specs[i].max);
   }
 }
 
@@ -550,4 +538,238 @@ TEST_CASE("R-load-attr: FirstChild walks children, not extra top-level elements"
   }
   CHECK(childCount == 1);
   CHECK(sawProject == true);
+}
+
+// ---------------------------------------------------------------------------
+// R5: the packed-storage boot-crash invariants.
+//
+// Two independent defects made any project containing instruments fail to
+// boot after the packed-storage migration:
+//
+//  1. SampleInstrument::Variables() returned a 1-element vector while
+//     I_Instrument::SaveContent/RestoreContent index it with idx in
+//     [0, GetParamCount()) == [0, 19). etl::vector::operator[] is unchecked,
+//     so idx >= 1 read past the end and dereferenced garbage as a Variable*.
+//
+//  2. VariableContainer::FindVariable dereferenced a null list_ for every
+//     migrated instrument (SID/Opal/Synth/Midi pass I_Instrument(nullptr)),
+//     and I_Instrument::RestoreContent calls it unconditionally at the end.
+//
+// These cannot be exercised by constructing instruments here (the host
+// target links with --unresolved-symbols=ignore-all and instrument ctors
+// need SamplePool/MidiService), so lock the static side of the contract:
+// every migrated instrument must declare enough SPECS entries to cover the
+// parameter count that the persistence loop will walk.
+// ---------------------------------------------------------------------------
+TEST_CASE("R5: packed instruments declare a full SPECS table (locks boot "
+          "crash)") {
+  // If a migrated instrument ever exposes a Variables() list again, it must
+  // be at least kParamCount long or SaveContent/RestoreContent walk off the
+  // end. Guard the counts the loop depends on.
+  CHECK(SampleInstrument::kParamCount == 19);
+  CHECK(MidiInstrument::kParamCount == 7);
+  CHECK(SIDInstrument::kParamCount == 18);
+  CHECK(OpalInstrument::kParamCount == 16);
+  CHECK(SynthInstrument::kParamCount == 38);
+}
+
+// ---------------------------------------------------------------------------
+// R6: parameters whose legacy on-disk form is a word, not a number.
+//
+// Pre-migration these were BOOL / CHAR_LIST Variables and were serialised via
+// Variable::GetString(). RestoreContent replaced that with atoi(), which maps
+// "true" -> 0, "linear" -> 0, "pingpong" -> 0 — silently corrupting every
+// such parameter on load. Real project files in test_root contain 237
+// "false", 142 "none", 94 "original", 64 "linear", 20 "loop", 7 "true".
+//
+// The parse now goes through I_Instrument::ParseParamValue, driven by each
+// instrument's StringParams() table. Verify the label tables the parse
+// depends on are the ones the SPECS max values imply, so a label table and
+// its ParamSpec can't drift apart.
+// ---------------------------------------------------------------------------
+TEST_CASE("R6: CHAR_LIST/BOOL params have max consistent with label count") {
+  // SampleInstrument: interpol (2 labels), filter mode (3), loop mode
+  // (SILM_LAST), table automation (bool -> max 1).
+  CHECK(SampleInstrument::SPECS[2].max == 1);          // interpol: 2 labels
+  CHECK(SampleInstrument::SPECS[12].max == 3);         // filter mode
+  CHECK(SampleInstrument::SPECS[14].max == SILM_LAST - 1); // loop mode
+  CHECK(SampleInstrument::SPECS[18].max == 1);         // table automation
+
+  // MidiInstrument: table automation is the only BOOL.
+  CHECK(MidiInstrument::SPECS[5].max == 1);
+
+  // SIDInstrument: waveform is CHAR_LIST; vsync/ring/filter-on/table-auto
+  // are BOOLs.
+  CHECK(SIDInstrument::SPECS[3].max == 1);  // vsync
+  CHECK(SIDInstrument::SPECS[4].max == 1);  // ring mod
+  CHECK(SIDInstrument::SPECS[6].max == 1);  // filter on
+  CHECK(SIDInstrument::SPECS[8].max == 1);  // table automation
+
+  // OpalInstrument: algorithm (2 labels), waveshapes (8), key scale (4).
+  CHECK(OpalInstrument::SPECS[1].max == 1);   // algorithm: 2 labels
+  CHECK(OpalInstrument::SPECS[7].max == 7);   // op1 waveshape: 8 labels
+  CHECK(OpalInstrument::SPECS[8].max == 3);   // op1 key scale: 4 labels
+  CHECK(OpalInstrument::SPECS[13].max == 7);  // op2 waveshape
+  CHECK(OpalInstrument::SPECS[14].max == 3);  // op2 key scale
+}
+
+// ---------------------------------------------------------------------------
+// R9: signed KX1 parameters must admit their negative half.
+//
+// The DSP reads these four as int8_t and uses the sign directly: negative
+// detune tunes an operator DOWN, negative pitch depth is a downward sweep
+// (the standard kick/tom envelope), and negative filter env depth makes the
+// envelope CLOSE the filter. None of those are reachable by any positive
+// value. The packed-storage migration gave all four min=0, and since
+// SetParamValue clamps to [min, max], every negative write silently became 0.
+// ---------------------------------------------------------------------------
+TEST_CASE("R9: signed synth params admit negative values") {
+  struct {
+    int idx;
+    int min;
+    int max;
+  } kSigned[] = {
+      {SynthInstrument::PARAM_OP2_DETUNE, -64, 63},
+      {SynthInstrument::PARAM_OP3_DETUNE, -64, 63},
+      {SynthInstrument::PARAM_FLT_ENV_DEPTH, -128, 127},
+      {SynthInstrument::PARAM_PITCH_DEPTH, -128, 127},
+  };
+
+  SynthInstrument in;
+  for (auto &s : kSigned) {
+    INFO("param idx ", s.idx);
+    // The spec range must match what the UI field offers and what int8_t
+    // can carry, otherwise SetParamValue clamps the negative half away.
+    CHECK(SynthInstrument::SPECS[s.idx].min == s.min);
+    CHECK(SynthInstrument::SPECS[s.idx].max == s.max);
+
+    for (int v : {s.min, s.min / 2, -1, 0, 1, s.max}) {
+      in.SetParamValue(s.idx, v);
+      INFO("value ", v);
+      CHECK(in.GetParamValue(s.idx) == v);
+      // Must survive the int8_t narrowing the DSP applies in buildParams.
+      CHECK((int)(int8_t)in.GetParamValue(s.idx) == v);
+    }
+
+    // Still clamped outside the declared range.
+    in.SetParamValue(s.idx, s.min - 1);
+    CHECK(in.GetParamValue(s.idx) == s.min);
+    in.SetParamValue(s.idx, s.max + 1);
+    CHECK(in.GetParamValue(s.idx) == s.max);
+  }
+}
+
+// The serialize/parse hooks are protected; a subclass reaches them without
+// widening the production API just for a test.
+namespace {
+struct SynthPersistProbe : public SynthInstrument {
+  using SynthInstrument::FormatParamValue;
+  using SynthInstrument::ParseParamValue;
+};
+} // namespace
+
+TEST_CASE("R9b: negative synth params survive a save/load round-trip") {
+  SynthPersistProbe in;
+  const int kIdx[] = {
+      SynthInstrument::PARAM_OP2_DETUNE, SynthInstrument::PARAM_OP3_DETUNE,
+      SynthInstrument::PARAM_FLT_ENV_DEPTH, SynthInstrument::PARAM_PITCH_DEPTH};
+
+  for (int idx : kIdx) {
+    for (int v : {(int)SynthInstrument::SPECS[idx].min, -7, -1, 0, 42}) {
+      in.SetParamValue(idx, v);
+      REQUIRE(in.GetParamValue(idx) == v);
+
+      // Exactly what SaveContent writes into the PARAM VALUE attribute...
+      char buf[32] = {0};
+      const char *written = in.FormatParamValue(idx, buf, sizeof(buf));
+      INFO("idx ", idx, " value ", v, " serialised as \"", written, "\"");
+      // A signed value must keep its minus sign on disk.
+      CHECK((v < 0) == (written[0] == '-'));
+
+      // ...and exactly what RestoreContent parses back out of it.
+      CHECK(in.ParseParamValue(idx, written) == v);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// R7: the "table unbound" sentinel must survive a load.
+//
+// 192 of the instrument entries in test_root store table="-1". SetParamValue
+// clamps to [min, max]; with min=0 that sentinel became 0, binding every
+// unbound instrument to table 0. min must admit -1.
+// ---------------------------------------------------------------------------
+TEST_CASE("R7: Table param min admits the -1 unbound sentinel") {
+  CHECK(SampleInstrument::SPECS[17].min == -1);
+  CHECK(SIDInstrument::SPECS[7].min == -1);
+  CHECK(SynthInstrument::SPECS[36].min == -1);
+  CHECK(MidiInstrument::SPECS[4].min == -1);
+}
+
+// ---------------------------------------------------------------------------
+// R8: parameters drawn with a "%s" format must resolve to a label.
+//
+// UIIntVarField::Draw picks its branch from ReadType(). While
+// UIParamIntVarField::ReadType() returned INT unconditionally, every packed
+// parameter whose UI format is "%s" ("wave:  %s", "route:    %s", the BOOL
+// toggles, ...) was formatted as npf_snprintf(buf, n, "%s", (int)value) —
+// i.e. the value was dereferenced as a char *, which segfaults.
+//
+// GetParamLabel() is what the draw path now calls. It must return a printable
+// string for every value in [min, max] of every string-typed parameter, and
+// nullptr for numeric ones (so those keep the integer branch).
+// ---------------------------------------------------------------------------
+template <typename T> static void checkParamLabels(const char *what, T &in) {
+  int stringTyped = 0;
+  for (int idx = 1; idx < in.GetParamCount(); idx++) {
+    if (!in.IsParamStringTyped(idx)) {
+      INFO(what, " idx ", idx, " is numeric and must have no label");
+      CHECK(in.GetParamLabel(idx) == nullptr);
+      continue;
+    }
+    stringTyped++;
+    for (int v = in.GetParamMin(idx); v <= in.GetParamMax(idx); v++) {
+      in.SetParamValue(idx, v);
+      const char *label = in.GetParamLabel(idx);
+      INFO(what, " idx ", idx, " value ", v);
+      REQUIRE(label != nullptr); // a null here is the crash
+      CHECK(label[0] != '\0');
+    }
+  }
+  INFO(what, " should declare at least one string-typed param");
+  CHECK(stringTyped > 0);
+}
+
+TEST_CASE("R8: string-typed params resolve to a printable label") {
+  SUBCASE("SynthInstrument") {
+    SynthInstrument in;
+    checkParamLabels("SynthInstrument", in);
+    // The KX1 label tables were orphaned by the packed-storage migration:
+    // nothing referenced them, so these are the values that used to crash.
+    in.SetParamValue(SynthInstrument::PARAM_OP1_WAVE, SYNTH_WAVE_NOISE);
+    CHECK(strcmp(in.GetParamLabel(SynthInstrument::PARAM_OP1_WAVE),
+                 "noise") == 0);
+    in.SetParamValue(SynthInstrument::PARAM_LFO_SHAPE, SYNTH_LFO_SH);
+    CHECK(strcmp(in.GetParamLabel(SynthInstrument::PARAM_LFO_SHAPE),
+                 "S&H") == 0);
+    in.SetParamValue(SynthInstrument::PARAM_HARD_SYNC, 1);
+    CHECK(strcmp(in.GetParamLabel(SynthInstrument::PARAM_HARD_SYNC),
+                 "true") == 0);
+    in.SetParamValue(SynthInstrument::PARAM_HARD_SYNC, 0);
+    CHECK(strcmp(in.GetParamLabel(SynthInstrument::PARAM_HARD_SYNC),
+                 "false") == 0);
+  }
+  SUBCASE("SIDInstrument") {
+    SIDInstrument in(SIDInstrumentInstance(0));
+    checkParamLabels("SIDInstrument", in);
+  }
+  // OpalInstrument is deliberately not instantiated: its constructor builds an
+  // Opal emulator, whose Channel/Operator constructors are among the symbols
+  // this target leaves unresolved (see the -Wl,--unresolved-symbols note in
+  // tests/CMakeLists.txt), so `OpalInstrument in;` calls a null address. Its
+  // label table is still covered structurally by R6.
+  SUBCASE("MidiInstrument") {
+    MidiInstrument in;
+    checkParamLabels("MidiInstrument", in);
+  }
 }

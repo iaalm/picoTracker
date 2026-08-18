@@ -31,7 +31,12 @@ public:
   virtual int ReadInt() const override;
   virtual void WriteInt(int v) override;
   virtual etl::string<MAX_VARIABLE_STRING_LENGTH> ReadString() const override;
-  virtual Variable::Type ReadType() const override { return Variable::INT; }
+  // Parameters whose UI format is "%s" (waveform, algorithm, filter mode and
+  // the BOOL toggles) must report a string type, otherwise
+  // UIIntVarField::Draw formats the raw int through a "%s" template and
+  // dereferences it as a char *. The instrument's label table is the single
+  // source of truth for which parameters those are.
+  virtual Variable::Type ReadType() const override;
   virtual bool ReadIsModified() const override;
   virtual void ResetVar() override;
   virtual FourCC GetVariableID() const override;

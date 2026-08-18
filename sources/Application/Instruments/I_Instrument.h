@@ -171,6 +171,19 @@ public:
   // re-renders.
   virtual void SetParamValue(int idx, int v);
 
+  // Label for a CHAR_LIST/BOOL parameter's current value, or nullptr when the
+  // parameter is plain-numeric.
+  //
+  // UI fields render with a "%s" format for these (e.g. "wave:  %s"), so the
+  // draw path MUST resolve the int to a label before formatting — passing the
+  // raw int to a "%s" template dereferences it as a char* and crashes. The
+  // label table is the same one persistence uses (StringParams), so the two
+  // paths cannot disagree about what a value is called.
+  const char *GetParamLabel(int idx) const;
+
+  // True when idx renders as a word rather than a number.
+  bool IsParamStringTyped(int idx) const { return FindStringParam(idx); }
+
   // State predicates.
   virtual bool IsParamModified(int idx) const;
 
@@ -195,6 +208,45 @@ protected:
   // For legacy (stage 0.5) instruments this delegates to the bound
   // Variable::GetString() to preserve the on-disk format; for migrated
   // (stage 1+) instruments it uses GetParamFormat(idx) + GetParamValue(idx).
-  const char *FormatParamValue(int idx, char *buf, size_t bufsize) const;
+  virtual const char *FormatParamValue(int idx, char *buf,
+                                       size_t bufsize) const;
+
+  // Parse an on-disk PARAM VALUE string into the packed int representation.
+  //
+  // Legacy .pti files store some parameters as words rather than numbers,
+  // because the pre-packed-storage code backed them with a BOOL or CHAR_LIST
+  // Variable and serialised Variable::GetString(). A plain atoi() maps every
+  // one of those to 0 — silently turning "true" into false and "pingpong"
+  // into "none". Instruments with such parameters override this to map the
+  // string back to its index; the default handles the BOOL spelling and
+  // plain integers.
+  virtual int ParseParamValue(int idx, const char *value) const;
+
+  // Map `value` against a CHAR_LIST-style label table, case-insensitively.
+  // Returns the matching index, or `fallback` when there is no match (which
+  // includes the normal case of an already-numeric value).
+  static int ParseFromList(const char *value, const char *const *labels,
+                           int count, int fallback);
+
+  // Describes one parameter whose on-disk form is a word, not a number.
+  // `labels == nullptr` means a BOOL parameter ("true"/"false"); otherwise
+  // the value is the index of the matching label.
+  struct StringParam {
+    int idx;
+    const char *const *labels;
+    int count;
+  };
+
+  // Instruments with BOOL/CHAR_LIST parameters return their table here; the
+  // default ParseParamValue/FormatParamValue consult it, so subclasses do
+  // not each need to reimplement the same switch. Returns nullptr (count 0)
+  // when every parameter is plain-numeric.
+  virtual const StringParam *StringParams(int &count) const {
+    count = 0;
+    return nullptr;
+  }
+
+  // Look up idx in StringParams(); nullptr when the param is numeric.
+  const StringParam *FindStringParam(int idx) const;
 };
 #endif
