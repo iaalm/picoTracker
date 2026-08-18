@@ -11,6 +11,7 @@
 #define _FIELD_VIEW_H_
 
 #include "BaseClasses/UIField.h"
+#include "Externals/etl/include/etl/list.h"
 #include "ScreenView.h"
 
 class FieldView : public ScreenView {
@@ -24,11 +25,23 @@ public:
   UIField *GetFocus();
   void ClearFocus();
   int GetFocusIndex();
-  void SetSize(int size);
+  void ResetScroll();
 
   etl::list<UIField *, 64> fieldList_; // adjust to maximum fields on one screen
   // ThemeView currently biggest user: uses 64 (12 colors * 5 + font + theme
   // name + buttons)
+
+protected:
+  // Scroll the field list vertically when content exceeds the screen.
+  // scrollOffset_ is the absolute Y of the topmost visible row.
+  void EnsureFocusVisible();
+  int GetMaxFieldY() const;
+  int GetMaxScrollOffset() const;
+  void DrawScrollBarIfNeeded();
+
+  static constexpr int kContentTop = 1; // first row below title bar
+  static constexpr int kContentBottom = 23; // SCREEN_HEIGHT - 1
+  int scrollOffset_ = 0;
 
 private:
   UIField *focus_;

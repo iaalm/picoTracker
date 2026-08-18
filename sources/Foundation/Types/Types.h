@@ -123,6 +123,45 @@ struct FourCC {
     OPALInstrumentOp2WaveShape = 138,
     OPALInstrumentOp2TremVibSusKSR = 139,
 
+    // 3-op hybrid synthesizer (see docs/synth-design-spec.md)
+    SynthInstrumentAlgorithm = 188,
+    SynthInstrumentFeedback = 189,
+    SynthInstrumentFeedbackOp = 190,
+    SynthInstrumentOp1Wave = 191,
+    SynthInstrumentOp1PW = 192,
+    SynthInstrumentOp1Level = 193,
+    SynthInstrumentOp1ADSR = 194,
+    SynthInstrumentOp2Wave = 195,
+    SynthInstrumentOp2Ratio = 196,
+    SynthInstrumentOp2Detune = 197,
+    SynthInstrumentOp2Level = 198,
+    SynthInstrumentOp2ADSR = 199,
+    SynthInstrumentOp3Wave = 200,
+    SynthInstrumentOp3Ratio = 201,
+    SynthInstrumentOp3Detune = 202,
+    SynthInstrumentOp3Level = 203,
+    SynthInstrumentOp3ADSR = 204,
+    SynthInstrumentFilterCutoff = 205,
+    SynthInstrumentFilterResonance = 206,
+    SynthInstrumentFilterMode = 207,
+    SynthInstrumentFilterKeytrack = 208,
+    SynthInstrumentFilterEnvDepth = 209,
+    SynthInstrumentFilterADSR = 210,
+    SynthInstrumentPitchDepth = 211,
+    SynthInstrumentPitchAD = 212,
+    SynthInstrumentLFORate = 213,
+    SynthInstrumentLFOShape = 214,
+    SynthInstrumentLFODepth = 215,
+    SynthInstrumentLFOTarget = 216,
+    SynthInstrumentLFODelay = 217,
+    SynthInstrumentPortamento = 218,
+    SynthInstrumentHardSync = 219,
+    SynthInstrumentRingMod = 220,
+    SynthInstrumentSubLevel = 221,
+    SynthInstrumentVolume = 222,
+    SynthInstrumentTable = 223,
+    SynthInstrumentTableAutomation = 224,
+
     ServicePersistency = 57,
 
     TrigTempoTap = 65,
@@ -375,6 +414,44 @@ struct FourCC {
   ETL_ENUM_TYPE(OPALInstrumentOp2ADSR, "OP2ADSR")
   ETL_ENUM_TYPE(OPALInstrumentOp2WaveShape, "OP2WAVESHAPE")
   ETL_ENUM_TYPE(OPALInstrumentOp2TremVibSusKSR, "OP2TREMVIBSUSKSR")
+
+  ETL_ENUM_TYPE(SynthInstrumentAlgorithm, "SYNALGORITHM")
+  ETL_ENUM_TYPE(SynthInstrumentFeedback, "SYNFEEDBACK")
+  ETL_ENUM_TYPE(SynthInstrumentFeedbackOp, "SYNFEEDBACKOP")
+  ETL_ENUM_TYPE(SynthInstrumentOp1Wave, "SYNOP1WAVE")
+  ETL_ENUM_TYPE(SynthInstrumentOp1PW, "SYNOP1PW")
+  ETL_ENUM_TYPE(SynthInstrumentOp1Level, "SYNOP1LEVEL")
+  ETL_ENUM_TYPE(SynthInstrumentOp1ADSR, "SYNOP1ADSR")
+  ETL_ENUM_TYPE(SynthInstrumentOp2Wave, "SYNOP2WAVE")
+  ETL_ENUM_TYPE(SynthInstrumentOp2Ratio, "SYNOP2RATIO")
+  ETL_ENUM_TYPE(SynthInstrumentOp2Detune, "SYNOP2DETUNE")
+  ETL_ENUM_TYPE(SynthInstrumentOp2Level, "SYNOP2LEVEL")
+  ETL_ENUM_TYPE(SynthInstrumentOp2ADSR, "SYNOP2ADSR")
+  ETL_ENUM_TYPE(SynthInstrumentOp3Wave, "SYNOP3WAVE")
+  ETL_ENUM_TYPE(SynthInstrumentOp3Ratio, "SYNOP3RATIO")
+  ETL_ENUM_TYPE(SynthInstrumentOp3Detune, "SYNOP3DETUNE")
+  ETL_ENUM_TYPE(SynthInstrumentOp3Level, "SYNOP3LEVEL")
+  ETL_ENUM_TYPE(SynthInstrumentOp3ADSR, "SYNOP3ADSR")
+  ETL_ENUM_TYPE(SynthInstrumentFilterCutoff, "SYNFLTCUTOFF")
+  ETL_ENUM_TYPE(SynthInstrumentFilterResonance, "SYNFLTRES")
+  ETL_ENUM_TYPE(SynthInstrumentFilterMode, "SYNFLTMODE")
+  ETL_ENUM_TYPE(SynthInstrumentFilterKeytrack, "SYNFLTKEYTRACK")
+  ETL_ENUM_TYPE(SynthInstrumentFilterEnvDepth, "SYNFLTENVDEPTH")
+  ETL_ENUM_TYPE(SynthInstrumentFilterADSR, "SYNFLTADSR")
+  ETL_ENUM_TYPE(SynthInstrumentPitchDepth, "SYNPITCHDEPTH")
+  ETL_ENUM_TYPE(SynthInstrumentPitchAD, "SYNPITCHAD")
+  ETL_ENUM_TYPE(SynthInstrumentLFORate, "SYNLFORATE")
+  ETL_ENUM_TYPE(SynthInstrumentLFOShape, "SYNLFOSHAPE")
+  ETL_ENUM_TYPE(SynthInstrumentLFODepth, "SYNLFODEPTH")
+  ETL_ENUM_TYPE(SynthInstrumentLFOTarget, "SYNLFOTARGET")
+  ETL_ENUM_TYPE(SynthInstrumentLFODelay, "SYNLFODELAY")
+  ETL_ENUM_TYPE(SynthInstrumentPortamento, "SYNPORTAMENTO")
+  ETL_ENUM_TYPE(SynthInstrumentHardSync, "SYNHARDSYNC")
+  ETL_ENUM_TYPE(SynthInstrumentRingMod, "SYNRINGMOD")
+  ETL_ENUM_TYPE(SynthInstrumentSubLevel, "SYNSUBLEVEL")
+  ETL_ENUM_TYPE(SynthInstrumentVolume, "SYNVOLUME")
+  ETL_ENUM_TYPE(SynthInstrumentTable, "SYNTABLE")
+  ETL_ENUM_TYPE(SynthInstrumentTableAutomation, "SYNTABLEAUTO")
 
   ETL_ENUM_TYPE(VarFGColor, "FOREGROUND")
   ETL_ENUM_TYPE(VarBGColor, "BACKGROUND")

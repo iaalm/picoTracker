@@ -8,12 +8,64 @@
  */
 
 #include "FieldView.h"
+#include "Application/AppWindow.h"
 #include "System/Console/Trace.h"
 #include "UIIntVarField.h"
 
 FieldView::FieldView(GUIWindow &w, ViewData *data) : ScreenView(w, data) {
   focus_ = 0;
+  scrollOffset_ = 0;
 };
+
+void FieldView::ResetScroll() { scrollOffset_ = 0; }
+
+int FieldView::GetMaxFieldY() const {
+  int maxY = kContentTop;
+  for (auto it = fieldList_.begin(); it != fieldList_.end(); ++it) {
+    int y = (*it)->GetPosition()._y;
+    if (y > maxY) {
+      maxY = y;
+    }
+  }
+  return maxY;
+}
+
+int FieldView::GetMaxScrollOffset() const {
+  int maxY = GetMaxFieldY();
+  int maxScroll = maxY - kContentBottom;
+  return maxScroll > 0 ? maxScroll : 0;
+}
+
+void FieldView::EnsureFocusVisible() {
+  if (!focus_) {
+    return;
+  }
+
+  int fy = focus_->GetPosition()._y;
+  if (fy < scrollOffset_ + kContentTop) {
+    scrollOffset_ = fy - kContentTop;
+  }
+  if (fy > scrollOffset_ + kContentBottom) {
+    scrollOffset_ = fy - kContentBottom;
+  }
+  if (scrollOffset_ < 0) {
+    scrollOffset_ = 0;
+  }
+  int maxScroll = GetMaxScrollOffset();
+  if (scrollOffset_ > maxScroll) {
+    scrollOffset_ = maxScroll;
+  }
+}
+
+void FieldView::DrawScrollBarIfNeeded() {
+  const int visibleLines = kContentBottom - kContentTop + 1;
+  const int totalLines = GetMaxFieldY() - kContentTop + 1;
+  if (totalLines <= visibleLines) {
+    return;
+  }
+  drawScrollBar(SCREEN_WIDTH - 1, kContentTop, visibleLines, scrollOffset_,
+                totalLines);
+}
 
 void FieldView::SetFocus(UIField *field) {
 
@@ -28,6 +80,7 @@ void FieldView::SetFocus(UIField *field) {
     return;
 
   focus_->SetFocus();
+  EnsureFocusVisible();
 };
 
 void FieldView::ClearFocus() {
@@ -41,15 +94,23 @@ UIField *FieldView::GetFocus() { return focus_; };
 
 void FieldView::Redraw() {
 
-  if (focus_ == 0) {
+  if (focus_ == 0 && !fieldList_.empty()) {
     SetFocus(*fieldList_.begin());
+  } else {
+    EnsureFocusVisible();
   }
 
+  const int drawOffset = -scrollOffset_;
   auto it = fieldList_.begin();
   for (size_t i = 0; i < fieldList_.size(); i++) {
-    (*it)->Draw(w_);
+    int drawY = (*it)->GetPosition()._y + drawOffset;
+    if (drawY >= kContentTop && drawY <= kContentBottom) {
+      (*it)->Draw(w_, drawOffset);
+    }
     it++;
-  };
+  }
+
+  DrawScrollBarIfNeeded();
 };
 
 void FieldView::ProcessButtonMask(unsigned short mask, bool pressed) {
@@ -169,6 +230,7 @@ void FieldView::ProcessButtonMask(unsigned short mask, bool pressed) {
           focus_->ClearFocus();
           focus_ = next;
           focus_->SetFocus();
+          EnsureFocusVisible();
           isDirty_ = true;
         }
 
@@ -220,6 +282,7 @@ void FieldView::ProcessButtonMask(unsigned short mask, bool pressed) {
           focus_->ClearFocus();
           focus_ = prev;
           focus_->SetFocus();
+          EnsureFocusVisible();
           isDirty_ = true;
         }
 
@@ -260,6 +323,7 @@ void FieldView::ProcessButtonMask(unsigned short mask, bool pressed) {
           focus_->ClearFocus();
           focus_ = next;
           focus_->SetFocus();
+          EnsureFocusVisible();
           isDirty_ = true;
         }
 
@@ -301,6 +365,7 @@ void FieldView::ProcessButtonMask(unsigned short mask, bool pressed) {
           focus_->ClearFocus();
           focus_ = prev;
           focus_->SetFocus();
+          EnsureFocusVisible();
           isDirty_ = true;
         }
       }

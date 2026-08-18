@@ -20,7 +20,7 @@ static const int MAX_VARIABLE_STRING_LENGTH = 40;
 class Variable {
 
 public:
-  enum Type { INT, FLOAT, BOOL, CHAR_LIST, STRING };
+  enum Type : uint8_t { INT, FLOAT, BOOL, CHAR_LIST, STRING };
 
 public:
   Variable(FourCC id, int value = 0);
@@ -58,6 +58,9 @@ protected:
 
   FourCC id_;
   Type type_;
+  // Only meaningful for CHAR_LIST; kept adjacent to type_ so the two small
+  // fields share one word instead of each being padded out separately.
+  uint8_t listSize_;
 
   union {
     int int_;
@@ -78,7 +81,5 @@ protected:
   } list_;
 
   etl::istring *stringValue_ = nullptr;
-
-  uint8_t listSize_;
 };
 #endif

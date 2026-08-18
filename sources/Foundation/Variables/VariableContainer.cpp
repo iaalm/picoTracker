@@ -10,7 +10,7 @@
 #include "VariableContainer.h"
 #include <string.h>
 
-VariableContainer::VariableContainer(etl::ilist<Variable *> *list)
+VariableContainer::VariableContainer(etl::ivector<Variable *> *list)
     : list_(list){};
 
 VariableContainer::~VariableContainer(){};

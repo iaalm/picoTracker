@@ -52,12 +52,15 @@ protected:
   void fillSIDParameters();
   void fillMidiParameters();
   void fillOpalParameters();
+  void fillSynthParameters();
   void fillNoneParameters();
   I_Instrument *getInstrument();
   void Update(Observable &o, I_ObservableData *d);
   void refreshInstrumentFields();
   void addNameTextField(I_Instrument *instr, GUIPoint &position);
   void handleInstrumentExport();
+  FourCC getFocusParamID();
+  void printSynthParamHelp(FourCC param, GUITextProperties props);
 
 private:
   void onConfirmInstrumentTypeChange(View &view, ModalView &dialog);
@@ -85,8 +88,8 @@ private:
   etl::vector<UIActionField, 2> persistentActionField_;
   etl::vector<UIIntVarField, 40> intVarField_;
   etl::vector<UINoteVarField, 1> noteVarField_;
-  etl::vector<UIStaticField, 10> staticField_;
-  etl::vector<UIBigHexVarField, 4> bigHexVarField_;
+  etl::vector<UIStaticField, 16> staticField_;
+  etl::vector<UIBigHexVarField, 6> bigHexVarField_;
   etl::vector<UIIntVarOffField, 2> intVarOffField_;
   etl::vector<UIActionField, 1> sampleActionField_;
   etl::vector<UIBitmaskVarField, 3> bitmaskVarField_;

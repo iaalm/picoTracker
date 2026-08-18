@@ -67,7 +67,7 @@ public:
   virtual void RestoreContent(PersistencyDocument *doc);
 
 private:
-  etl::list<Variable *, 16> variables_;
+  etl::vector<Variable *, 16> variables_;
 
   InstrumentBank instrumentBank_;
   int tempoNudge_;
