@@ -183,12 +183,12 @@ public:
   virtual void SaveContent(tinyxml2::XMLPrinter *printer) override;
   virtual void RestoreContent(PersistencyDocument *doc) override;
 
-protected:
   // Linear search for a parameter by its display/persistence name. Used by
-  // RestoreContent and by callers that hold a FourCC or string name and want
-  // to map it to a parameter index. For ≤ 36 params this is faster than
-  // building a hash table. Returns -1 when the name is not in this
-  // instrument's spec table.
+  // RestoreContent and (via a test friend) by host tests that want to
+  // round-trip NAMES without instantiating an instrument. For ≤ 36 params
+  // this is faster than building a hash table. Returns -1 when the name is
+  // not in this instrument's spec table.
+protected:
   int FindParamByName(const char *name) const;
 
   // Format a parameter value at idx into a persistence-friendly string.

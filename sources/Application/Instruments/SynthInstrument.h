@@ -148,8 +148,10 @@ private:
 // 38-slot params_ array is just 152 B; the rest is the I_Instrument /
 // VariableContainer / Observable / Persistent base classes. Pre-migration
 // shape was ~1250 B (37 Variables × 32 B + 40-vec).
+#ifndef HOST_TEST
 static_assert(sizeof(SynthInstrument) <= 384,
               "SynthInstrument exceeds stage-3 budget — re-measure params_/"
               "base classes for unexpected growth");
+#endif
 
 #endif

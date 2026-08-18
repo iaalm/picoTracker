@@ -40,3 +40,9 @@ usermanual/web
 
 optbuild/**
 AGENTS.md
+
+# Test data: copies of TF cards / project files used by host tests.
+# Lives outside sources/; .gitignore prevents accidental commit of large
+# binary fixtures. test_tf/ will hold committed curated fixtures (small).
+test_root/**
+test_fixtures_tmp/**

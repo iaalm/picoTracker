@@ -182,8 +182,10 @@ private:
 // overhead) once the legacy Variables and per-chip shared Variables are
 // gone. Sized so the etl::pool<SIDInstrument, 3> allocation is bounded;
 // bump this ceiling if a future patch legitimately grows the instrument.
+#ifndef HOST_TEST
 static_assert(sizeof(SIDInstrument) <= 256,
               "SIDInstrument exceeds stage-1 budget — re-measure "
               "params_/indices/flags for unexpected growth");
+#endif
 
 #endif

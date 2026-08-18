@@ -34,11 +34,11 @@
 class MidiInstrument : public I_Instrument {
 
 public:
-  // 7 packed UI parameters + 1 reserved name slot. Index 0 is the
+  // 6 packed UI parameters + 1 reserved name slot. Index 0 is the
   // instrument name in this uniform param table; the actual string lives in
-  // the base-class `name_` member. Indices 1..7 are the MIDI parameters in
+  // the base-class `name_` member. Indices 1..6 are the MIDI parameters in
   // the same order as the legacy Variables() list.
-  static constexpr int kParamCount = 8;
+  static constexpr int kParamCount = 7;
   static const ParamSpec SPECS[kParamCount];
   static const char *const NAMES[kParamCount];
   static const char *const FORMATS[kParamCount];
@@ -54,9 +54,6 @@ public:
     PARAM_TABLE = 4,
     PARAM_TABLE_AUTO = 5,
     PARAM_PROGRAM = 6,
-    // Index 7 unused — kept to align with the legacy 7-slot Variables()
-    // count so the param array's kParamCount matches the 8 reserved slots.
-    PARAM_UNUSED_7 = 7,
   };
 
   MidiInstrument();
@@ -125,7 +122,7 @@ public:
 
 private:
   // Packed parameter storage. Replaces 7 Variable members; per-instance
-  // RAM drops from ~330 B to ~120 B (8 * 4 = 32 B params + base-class
+  // RAM drops from ~330 B to ~120 B (7 * 4 = 28 B params + base-class
   // overhead + pitch-bend state + lastNotes_).
   int32_t params_[kParamCount];
   static_assert(sizeof(params_) == kParamCount * 4,
@@ -153,13 +150,15 @@ private:
 
 // Sized so the etl::pool<MidiInstrument, 16> allocation is bounded; bump
 // this ceiling if a future patch legitimately grows the instrument. The
-// packed 8-slot params_ array is just 32 B; the rest is base-class
+// packed 7-slot params_ array is just 28 B; the rest is base-class
 // overhead + per-channel lastNotes_ + pitch-bend state. Pre-migration
 // shape was ~330 B (7 Variables × 32 B + 7-vec). The dominant fixed cost
 // here is the etl::array<uint8_t, 5> lastNotes_ per channel (8 channels
 // = 40 B) + 8 bools (first_) + ~20 B of pitch-bend state.
+#ifndef HOST_TEST
 static_assert(sizeof(MidiInstrument) <= 288,
               "MidiInstrument exceeds stage-5 budget — re-measure params_/"
               "pitch-bend state for unexpected growth");
+#endif
 
 #endif

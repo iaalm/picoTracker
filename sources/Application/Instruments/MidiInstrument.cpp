@@ -44,9 +44,6 @@ const ParamSpec MidiInstrument::SPECS[MidiInstrument::kParamCount] = {
     {FourCC::MidiInstrumentTableAutomation, 0, 5, 1, 0, 0, 1, 1, 1, 0, 0},
     // [6] Program (default VAR_OFF == -1)
     {FourCC::MidiInstrumentProgram, 0, 6, 1, -1, -1, 0x7F, 1, 0x10, 0, 0},
-    // [7] reserved / unused — kept to align with the legacy 7-slot
-    // Variables() count. Round-trip safety only.
-    {FourCC::Default, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0},
 };
 
 const char *const MidiInstrument::NAMES[MidiInstrument::kParamCount] = {
@@ -57,11 +54,10 @@ const char *const MidiInstrument::NAMES[MidiInstrument::kParamCount] = {
     /*  4 */ "table",
     /*  5 */ "table automation",
     /*  6 */ "program",
-    /*  7 */ "MidiInstrumentUnused",
 };
 
 const char *const MidiInstrument::FORMATS[MidiInstrument::kParamCount] = {
-    "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d",
+    "%d", "%d", "%d", "%d", "%d", "%d", "%d",
 };
 
 MidiInstrument::MidiInstrument() : I_Instrument(nullptr) {
@@ -454,7 +450,7 @@ int MidiInstrument::GetParamBigStep(int idx) const {
 }
 
 void MidiInstrument::SetParamValue(int idx, int v) {
-  if (idx < 0 || idx >= kParamCount || idx == PARAM_UNUSED_7) {
+  if (idx < 0 || idx >= kParamCount) {
     return;
   }
   if (idx == PARAM_NAME) {
@@ -482,8 +478,7 @@ bool MidiInstrument::IsParamModified(int idx) const {
 }
 
 void MidiInstrument::ResetParam(int idx) {
-  if (idx < 0 || idx >= kParamCount || idx == PARAM_NAME ||
-      idx == PARAM_UNUSED_7) {
+  if (idx < 0 || idx >= kParamCount || idx == PARAM_NAME) {
     return;
   }
   params_[idx] = SPECS[idx].default_;
@@ -491,9 +486,6 @@ void MidiInstrument::ResetParam(int idx) {
 
 void MidiInstrument::ResetAllParams() {
   for (int i = 1; i < kParamCount; i++) { // skip name slot at idx 0
-    if (i == PARAM_UNUSED_7) {
-      continue;
-    }
     params_[i] = SPECS[i].default_;
   }
 }
