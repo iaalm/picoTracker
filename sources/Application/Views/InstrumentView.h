@@ -17,6 +17,10 @@
 #include "BaseClasses/UIIntVarField.h"
 #include "BaseClasses/UIIntVarOffField.h"
 #include "BaseClasses/UINoteVarField.h"
+#include "BaseClasses/UIParamBigHexVarField.h"
+#include "BaseClasses/UIParamBitmaskVarField.h"
+#include "BaseClasses/UIParamIntVarField.h"
+#include "BaseClasses/UIParamIntVarOffField.h"
 #include "BaseClasses/UIStaticField.h"
 #include "BaseClasses/UITextField.h"
 #include "Externals/etl/include/etl/string.h"
@@ -93,6 +97,14 @@ private:
   etl::vector<UIIntVarOffField, 2> intVarOffField_;
   etl::vector<UIActionField, 1> sampleActionField_;
   etl::vector<UIBitmaskVarField, 3> bitmaskVarField_;
+  // Plan B: parallel storage for UIParam* field classes. Stage 1 routes
+  // SIDInstrument's fillSIDParameters through these. Other instruments
+  // (Sample, Synth, MIDI, OPAL) keep using the *VarField_ vectors above
+  // until they migrate in stages 2-5.
+  etl::vector<UIParamIntVarField, 40> paramIntVarField_;
+  etl::vector<UIParamBigHexVarField, 6> paramBigHexVarField_;
+  etl::vector<UIParamIntVarOffField, 2> paramIntVarOffField_;
+  etl::vector<UIParamBitmaskVarField, 3> paramBitmaskVarField_;
   etl::vector<UITextField<MAX_INSTRUMENT_NAME_LENGTH>, 1> nameTextField_;
   etl::vector<InstrumentNameVariable, 1> nameVariables_;
 };

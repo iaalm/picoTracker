@@ -13,7 +13,7 @@
 #include <System/Console/nanoprintf.h>
 #include <string.h>
 
-UIBitmaskVarField::UIBitmaskVarField(const GUIPoint &position, Variable &v,
+UIBitmaskVarField::UIBitmaskVarField(const GUIPoint &position, Variable *v,
                                      const char *format, int len)
     : UIIntVarField(position, v, format, 0, 0xffff, 0, 0, 0) {
   len_ = len;
@@ -27,7 +27,7 @@ void UIBitmaskVarField::Draw(GUIWindow &w, int offset) {
   position._y += offset;
 
   char buffer[MAX_FIELD_WIDTH + 1];
-  int value = src_.GetInt();
+  int value = ReadInt();
   npf_snprintf(buffer, sizeof(buffer), format_, value);
 
   if (focus_) {
@@ -56,7 +56,7 @@ void UIBitmaskVarField::Draw(GUIWindow &w, int offset) {
 
 void UIBitmaskVarField::ProcessArrow(unsigned short mask) {
 
-  int value = src_.GetInt();
+  int value = ReadInt();
 
   switch (mask) {
   case EPBM_LEFT:
@@ -78,9 +78,9 @@ void UIBitmaskVarField::ProcessArrow(unsigned short mask) {
     break;
   };
 
-  src_.SetInt(value);
+  WriteInt(value);
 
   SetChanged();
   NotifyObservers(reinterpret_cast<I_ObservableData *>(
-      static_cast<uintptr_t>(src_.GetID())));
+      static_cast<uintptr_t>(GetVariableID())));
 };

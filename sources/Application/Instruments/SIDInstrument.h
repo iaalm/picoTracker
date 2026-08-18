@@ -13,6 +13,7 @@
 #include "Application/Persistency/PersistenceConstants.h"
 #include "Externals/cRSID/SID.h"
 #include "I_Instrument.h"
+#include "ParamSpec.h"
 
 enum SIDInstrumentInstance { SID1 = 1, SID2 };
 
@@ -54,6 +55,38 @@ static const unsigned short sid_notes[96] = {
 class SIDInstrument : public I_Instrument {
 
 public:
+  // 17 packed UI parameters + 1 reserved name slot. Index 0 is the
+  // instrument name in this uniform param table; the actual string lives in
+  // the base-class `name_` member. Indices 1..17 are the SID-specific
+  // parameters in fixed order, mirroring the previous Variables() list.
+  static constexpr int kParamCount = 18;
+  static const ParamSpec SPECS[kParamCount];
+  static const char *const NAMES[kParamCount];
+  static const char *const FORMATS[kParamCount];
+
+  // Parameter indices into params_[]. Used by fillSIDParameters and the
+  // runtime hooks (Start / ProcessCommand) to read/write the packed array.
+  enum ParamIdx {
+    PARAM_NAME = 0,
+    PARAM_VPW = 1,           // PulseWidth
+    PARAM_VWF = 2,           // Waveform
+    PARAM_VSYNC = 3,         // VSync (bool)
+    PARAM_VRING = 4,         // RingMod (bool)
+    PARAM_VADSR = 5,         // ADSR
+    PARAM_VFON = 6,          // FilterOn (bool)
+    PARAM_TABLE = 7,         // Table
+    PARAM_TABLE_AUTO = 8,    // TableAutomation (bool)
+    PARAM_OSC = 9,           // OSCNumber
+    PARAM_FLTCUT_1 = 10,     // Filter Cut (SID1)
+    PARAM_FLTRES_1 = 11,     // Filter Resonance (SID1)
+    PARAM_FLTMODE_1 = 12,    // Filter Mode (SID1)
+    PARAM_VOL_1 = 13,        // Volume (SID1)
+    PARAM_FLTCUT_2 = 14,     // Filter Cut (SID2)
+    PARAM_FLTRES_2 = 15,     // Filter Resonance (SID2)
+    PARAM_FLTMODE_2 = 16,    // Filter Mode (SID2)
+    PARAM_VOL_2 = 17,        // Volume (SID2)
+  };
+
   SIDInstrument(SIDInstrumentInstance chip);
   virtual ~SIDInstrument();
 
@@ -65,6 +98,7 @@ public:
 
   // size refers to the number of samples
   // should always fill interleaved stereo / 16bit
+  // return value is true if any audio was rendered
   virtual bool Render(int channel, fixed *buffer, int size, bool updateTick);
   virtual void ProcessCommand(int channel, FourCC cc, ushort value);
 
@@ -82,59 +116,74 @@ public:
   virtual bool GetTableAutomation();
   virtual void GetTableState(TableSaveState &state);
   virtual void SetTableState(TableSaveState &state);
-  etl::ivector<Variable *> *Variables() { return &variables_; };
+
+  // Stage 1: returns nullptr — SID stores its parameters in the packed
+  // array, not in Variables(). The legacy `Variables()` interface is no
+  // longer the source of truth for this instrument.
+  const etl::ivector<Variable *> *Variables() const override { return nullptr; }
+
+  // --- Plan B new parameter API (stage 1: directly on packed array) ---
+  virtual int GetParamCount() const override { return kParamCount; }
+  virtual FourCC GetParamID(int idx) const override;
+  virtual const char *GetParamName(int idx) const override;
+  virtual const char *GetParamFormat(int idx) const override;
+  virtual int GetParamMin(int idx) const override;
+  virtual int GetParamMax(int idx) const override;
+  virtual int GetParamDefault(int idx) const override;
+  virtual int GetParamStep(int idx) const override;
+  virtual int GetParamBigStep(int idx) const override;
+  virtual int GetParamValue(int idx) const override { return params_[idx]; }
+  virtual void SetParamValue(int idx, int v) override;
+  virtual bool IsParamModified(int idx) const override;
+  virtual void ResetParam(int idx) override;
+  virtual void ResetAllParams() override;
 
   SIDInstrumentInstance GetChip() { return chip_; };
-  unsigned short GetOsc() { return osc_.GetInt(); };
+  unsigned short GetOsc() { return (unsigned short)params_[PARAM_OSC]; }
   void SetRender(bool render) { render_ = render; };
 
   // returns just the chip name, eg "SID #1"
   const char *GetChipName() { return (chip_ == SID1) ? "SID #1" : "SID #2"; };
 
 private:
-  etl::vector<Variable *, 19> variables_;
+  // Packed parameter storage. Replaces the 17 Variable members + the legacy
+  // static fltcut1/fltcut2/etc. Variables; per-instance RAM drops from ~400 B
+  // to ~96 B (18 * 4 = 72 B params + chip + chip-bound indices + flags +
+  // table state).
+  int32_t params_[kParamCount];
+  static_assert(sizeof(params_) == kParamCount * 4,
+                "params_ must be tightly packed");
 
   SIDInstrumentInstance chip_; // SID1 or SID2
+
+  // Index helpers bound in Init() to the active chip's parameter slot.
+  int fltcutIdx_;
+  int fltresIdx_;
+  int fltmodeIdx_;
+  int volIdx_;
+
   bool render_ = false;
 
   bool playing_;
   bool gate_;
-  //  bool retrig_;
-  // int retrigLoop_;
   TableSaveState tableState_;
-  //  bool first_[SONG_CHANNEL_COUNT];
-  //  reSID::SID sid_;
-  //  reSID::cycle_count delta_t_;
   static cRSID sid1_;
   static cRSID sid2_;
   cRSID *sid_;
   static SIDInstrument *SID1RenderMaster;
   static SIDInstrument *SID2RenderMaster;
-  //  static bool rendered1_;
-
-  Variable vpw_;
-  Variable vwf_;
-  Variable vsync_;
-  Variable vring_;
-  Variable vadsr_;
-  Variable vfon_;
-  Variable table_;
-  Variable tableAuto_;
-  Variable osc_; // 0, 1 or 2
-
-  // all these settings are shared by all oscillators on a single SID Chip
-  static Variable fltcut1_;
-  static Variable fltcut2_;
-  Variable *fltcut_;
-  static Variable fltres1_;
-  static Variable fltres2_;
-  Variable *fltres_;
-  static Variable fltmode1_;
-  static Variable fltmode2_;
-  Variable *fltmode_;
-  static Variable vol1_;
-  static Variable vol2_;
-  Variable *vol_;
 };
+
+// Documented per-instance RAM budget after stage 1 migration. The packed
+// array is 72 B; the rest are flags, the chip-bound index slots, the
+// I_Instrument / VariableContainer / Observable / Persistent base-class
+// vtable + members, and TableSaveState. This drops from the pre-migration
+// ~700 B (17 Variables × 32 B + shared-statics pointer + per-instance
+// overhead) once the legacy Variables and per-chip shared Variables are
+// gone. Sized so the etl::pool<SIDInstrument, 3> allocation is bounded;
+// bump this ceiling if a future patch legitimately grows the instrument.
+static_assert(sizeof(SIDInstrument) <= 256,
+              "SIDInstrument exceeds stage-1 budget — re-measure "
+              "params_/indices/flags for unexpected growth");
 
 #endif

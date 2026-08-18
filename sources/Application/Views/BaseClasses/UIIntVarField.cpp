@@ -19,7 +19,7 @@
 
 #define abs(x) (x < 0 ? -x : x)
 
-UIIntVarField::UIIntVarField(const GUIPoint &position, Variable &v,
+UIIntVarField::UIIntVarField(const GUIPoint &position, Variable *v,
                              const char *format, int min, int max, int xOffset,
                              int yOffset, int displayOffset)
     : UIField(position), src_(v) {
@@ -37,25 +37,25 @@ void UIIntVarField::Draw(GUIWindow &w, int offset) {
   GUIPoint position = GetPosition();
   position._y += offset;
 
-  Variable::Type type = src_.GetType();
+  Variable::Type type = ReadType();
   char buffer[MAX_FIELD_WIDTH + 1];
   switch (type) {
   case Variable::INT: {
-    int ivalue = src_.GetInt() + displayOffset_;
+    int ivalue = ReadInt() + displayOffset_;
     npf_snprintf(buffer, sizeof(buffer), format_, ivalue, ivalue);
   } break;
   case Variable::CHAR_LIST:
     // if no value initialize with "NONE"
-    if (src_.GetInt() < 0) {
+    if (ReadInt() < 0) {
       npf_snprintf(buffer, sizeof(buffer), format_, "NONE");
     } else {
-      auto value = src_.GetString();
+      auto value = ReadString();
       const char *cvalue = value.c_str();
       npf_snprintf(buffer, sizeof(buffer), format_, cvalue);
     }
     break;
   case Variable::BOOL: {
-    auto value = src_.GetString();
+    auto value = ReadString();
     const char *cvalue = value.c_str();
     npf_snprintf(buffer, sizeof(buffer), format_, cvalue);
   } break;
@@ -74,7 +74,7 @@ void UIIntVarField::Draw(GUIWindow &w, int offset) {
 };
 
 void UIIntVarField::ProcessArrow(unsigned short mask) {
-  int value = src_.GetInt();
+  int value = ReadInt();
 
   switch (mask) {
   case EPBM_UP:
@@ -97,24 +97,59 @@ void UIIntVarField::ProcessArrow(unsigned short mask) {
     value = max_;
   }
 
-  src_.SetInt(value);
+  WriteInt(value);
 
   SetChanged();
   NotifyObservers(reinterpret_cast<I_ObservableData *>(
-      static_cast<uintptr_t>(src_.GetID())));
+      static_cast<uintptr_t>(GetVariableID())));
 };
 
 void UIIntVarField::ProcessClear() {
-  if (!src_.IsModified())
+  if (!ReadIsModified())
     return;
 
-  src_.Reset();
+  ResetVar();
 
   SetChanged();
   NotifyObservers(reinterpret_cast<I_ObservableData *>(
-      static_cast<uintptr_t>(src_.GetID())));
+      static_cast<uintptr_t>(GetVariableID())));
 };
 
-FourCC UIIntVarField::GetVariableID() { return src_.GetID(); };
+FourCC UIIntVarField::GetVariableID() const {
+  return src_ ? src_->GetID() : FourCC::Default;
+};
 
-Variable &UIIntVarField::GetVariable() { return src_; };
+Variable &UIIntVarField::GetVariable() { return *src_; };
+
+// ---------------------------------------------------------------------------
+// Storage-model-agnostic accessors. Default implementations delegate to the
+// bound Variable. UIParam* subclasses (stage 0.6) override these to read
+// from / write to a packed (I_Instrument *, idx) pair instead.
+// ---------------------------------------------------------------------------
+
+int UIIntVarField::ReadInt() const {
+  return src_ ? src_->GetInt() : 0;
+}
+
+void UIIntVarField::WriteInt(int v) {
+  if (src_)
+    src_->SetInt(v);
+}
+
+etl::string<MAX_VARIABLE_STRING_LENGTH> UIIntVarField::ReadString() const {
+  return src_ ? src_->GetString()
+              : etl::string<MAX_VARIABLE_STRING_LENGTH>();
+}
+
+Variable::Type UIIntVarField::ReadType() const {
+  return src_ ? src_->GetType() : Variable::INT;
+}
+
+bool UIIntVarField::ReadIsModified() const {
+  return src_ && src_->IsModified();
+}
+
+void UIIntVarField::ResetVar() {
+  if (src_)
+    src_->Reset();
+}

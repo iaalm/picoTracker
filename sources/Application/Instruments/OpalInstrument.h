@@ -14,6 +14,7 @@
 #include "Application/Persistency/PersistenceConstants.h"
 #include "Externals/opal/opal.h"
 #include "I_Instrument.h"
+#include "ParamSpec.h"
 #include <cstdint>
 
 #define OPAL_MAX_CHANNELS 4
@@ -21,6 +22,36 @@
 class OpalInstrument : public I_Instrument {
 
 public:
+  // 15 packed UI parameters + 1 reserved name slot. Index 0 is the
+  // instrument name in this uniform param table; the actual string lives in
+  // the base-class `name_` member. Indices 1..15 are the OPAL parameters in
+  // the same order as the legacy Variables() list.
+  static constexpr int kParamCount = 16;
+  static const ParamSpec SPECS[kParamCount];
+  static const char *const NAMES[kParamCount];
+  static const char *const FORMATS[kParamCount];
+
+  // Parameter indices into params_[]. Used by fillOpalParameters and the
+  // runtime hooks (Start / ProcessCommand) to read/write the packed array.
+  enum ParamIdx {
+    PARAM_NAME = 0,
+    PARAM_ALGORITHM = 1,
+    PARAM_FEEDBACK = 2,
+    PARAM_DEEP_TREM_VIB = 3,
+    PARAM_OP1_LEVEL = 4,
+    PARAM_OP1_MULTIPLIER = 5,
+    PARAM_OP1_ADSR = 6,
+    PARAM_OP1_WAVESHAPE = 7,
+    PARAM_OP1_KEYSCALE = 8,
+    PARAM_OP1_TREM_VIB_SUS_KSR = 9,
+    PARAM_OP2_LEVEL = 10,
+    PARAM_OP2_MULTIPLIER = 11,
+    PARAM_OP2_ADSR = 12,
+    PARAM_OP2_WAVESHAPE = 13,
+    PARAM_OP2_KEYSCALE = 14,
+    PARAM_OP2_TREM_VIB_SUS_KSR = 15,
+  };
+
   OpalInstrument();
   virtual ~OpalInstrument();
 
@@ -32,6 +63,7 @@ public:
 
   // size refers to the number of samples
   // should always fill interleaved stereo / 16bit
+  // return value is true if any audio was rendered
   virtual bool Render(int channel, fixed *buffer, int size, bool updateTick);
   virtual void ProcessCommand(int channel, FourCC cc, ushort value);
 
@@ -47,7 +79,26 @@ public:
   virtual bool GetTableAutomation();
   virtual void GetTableState(TableSaveState &state);
   virtual void SetTableState(TableSaveState &state);
-  etl::ivector<Variable *> *Variables() { return &variables_; };
+
+  // Stage 2: returns nullptr — OPAL stores its parameters in the packed
+  // array, not in Variables().
+  const etl::ivector<Variable *> *Variables() const override { return nullptr; }
+
+  // --- Plan B new parameter API (stage 2: directly on packed array) ---
+  virtual int GetParamCount() const override { return kParamCount; }
+  virtual FourCC GetParamID(int idx) const override;
+  virtual const char *GetParamName(int idx) const override;
+  virtual const char *GetParamFormat(int idx) const override;
+  virtual int GetParamMin(int idx) const override;
+  virtual int GetParamMax(int idx) const override;
+  virtual int GetParamDefault(int idx) const override;
+  virtual int GetParamStep(int idx) const override;
+  virtual int GetParamBigStep(int idx) const override;
+  virtual int GetParamValue(int idx) const override { return params_[idx]; }
+  virtual void SetParamValue(int idx, int v) override;
+  virtual bool IsParamModified(int idx) const override;
+  virtual void ResetParam(int idx) override;
+  virtual void ResetAllParams() override;
 
   void setChannel(uint8_t channel);
 
@@ -56,26 +107,24 @@ private:
 
   uint8_t breg;
 
-  etl::vector<Variable *, 16> variables_;
-
-  Variable algorithm_;
-  Variable feedback_;
-  Variable deepTremeloVibrato_;
-
-  Variable op1Level_;
-  Variable op1Multiplier_;
-  Variable op1ADSR_;
-  Variable op1WaveShape_;
-  // Termelo(AM),Vibrato(VIB),SustainingVoice(EG),EnveloperScale(KSR)
-  Variable op1TremVibSusKSR_;
-  Variable op1KeyScaleLevel_;
-  Variable op2Level_;
-  Variable op2Multiplier_;
-  Variable op2ADSR_;
-  Variable op2WaveShape_;
-  // Termelo(AM),Vibrato(VIB),SustainingVoice(EG),EnveloperScale(KSR)
-  Variable op2TremVibSusKSR_;
-  Variable op2KeyScaleLevel_;
+  // Packed parameter storage. Replaces 15 Variable members + the
+  // etl::vector<Variable*, 16>; per-instance RAM drops from ~700 B to
+  // ≈ 200 B (16 * 4 = 64 B params + Opal DSP embed + flag + register cache
+  // + base-class overhead).
+  int32_t params_[kParamCount];
+  static_assert(sizeof(params_) == kParamCount * 4,
+                "params_ must be tightly packed");
 };
+
+// Sized so the etl::pool<OpalInstrument, 3> allocation is bounded; bump this
+// ceiling if a future patch legitimately grows the instrument. The dominant
+// fixed cost is the embedded `Opal` DSP state (an OPL3 emulator) — the
+// packed 16-slot params_ array is just 64 B; the rest is the DSP, the
+// I_Instrument / VariableContainer / Observable / Persistent base classes,
+// and a 1-byte register cache. Pre-migration shape was ~700 B
+// (15 Variables × 32 B + 16-vec).
+static_assert(sizeof(OpalInstrument) <= 416,
+              "OpalInstrument exceeds stage-2 budget — re-measure params_/"
+              "Opal DSP embed for unexpected growth");
 
 #endif

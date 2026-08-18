@@ -14,8 +14,13 @@
 
 class UIIntVarOffField : public UIIntVarField {
 public:
-  UIIntVarOffField(const GUIPoint &position, Variable &v, const char *format,
+  // Nullable pointer overload (stage 0.6+). Used by UIParamIntVarOffField.
+  UIIntVarOffField(const GUIPoint &position, Variable *v, const char *format,
                    int min, int max, int xOffset, int yOffset);
+  // Legacy Variable& overload for existing call sites.
+  UIIntVarOffField(const GUIPoint &position, Variable &v, const char *format,
+                   int min, int max, int xOffset, int yOffset)
+      : UIIntVarOffField(position, &v, format, min, max, xOffset, yOffset) {}
   virtual void ProcessArrow(unsigned short mask);
   virtual void Draw(GUIWindow &w, int offset = 0);
 };
