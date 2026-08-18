@@ -128,6 +128,11 @@ struct SynthVoice {
   uint32_t op1_phase;
   uint32_t op2_phase;
   uint32_t op3_phase;
+  // Sub oscillator, one octave below op1. It needs its own accumulator:
+  // shifting op1_phase right only compresses the phase into half the table
+  // and snaps back every op1 cycle, which is the same pitch plus a
+  // discontinuity, not an octave down.
+  uint32_t sub_phase;
   uint32_t noise_state; // 23-bit LFSR
 
   // --- operator envelopes ---

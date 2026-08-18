@@ -26,9 +26,18 @@ constexpr int kSineSize = 1 << kSineBits; // 1024
 constexpr int kWaveAmp = 8192;           // operator output amplitude (+/-)
 
 // How hard a modulator drives a carrier's phase. Higher = more aggressive FM.
-constexpr int kFMShift = 17;
-// Self-feedback strength per feedback step (0-7).
-constexpr int kFBShift = 12;
+//
+// A modulator at full level produces |o_out| ~= 8160, and the phase it feeds
+// is a full 2^32 cycle, so the FM index in radians is
+// (o_out << kFMShift >> 8) / 2^32 * 2*pi. At the original 17 that gave
+// ~0.006 rad — three orders of magnitude below the ~1-10 rad range where FM
+// actually produces sidebands, so the whole FM section was inaudible.
+// 24 gives ~0.78 rad per operator while keeping the worst case (algorithm 1,
+// mod2 + mod3, both boosted by a full LFO->FM sweep) inside int32.
+constexpr int kFMShift = 24;
+// Self-feedback strength per feedback step (0-7). Same reasoning as kFMShift:
+// at 12 the maximum feedback phase was ~0.0013 rad, i.e. no audible effect.
+constexpr int kFBShift = 19;
 // Final output headroom shift applied before clipping to int16.
 constexpr int kOutShift = 0;
 
@@ -42,6 +51,13 @@ bool tablesReady = false;
 
 inline int32_t clampInt(int32_t v, int32_t lo, int32_t hi) {
   return v < lo ? lo : (v > hi ? hi : v);
+}
+
+// Advance the 23-bit Galois LFSR (poly x^23 + x^18 + 1) one step.
+inline uint32_t nextNoise(uint32_t &noiseState) {
+  uint32_t bit = ((noiseState >> 22) ^ (noiseState >> 17)) & 1;
+  noiseState = ((noiseState << 1) | bit) & 0x7FFFFF;
+  return noiseState;
 }
 
 // Raw oscillator value in [-kWaveAmp, kWaveAmp] for a 32-bit phase.
@@ -65,11 +81,7 @@ inline int32_t osc(uint32_t phase, uint8_t wave, uint16_t pw,
     return (phase < threshold) ? kWaveAmp : -kWaveAmp;
   }
   case SYNTH_WAVE_NOISE: {
-    // 23-bit Galois LFSR, poly x^23 + x^18 + 1
-    uint32_t lfsr = noiseState;
-    uint32_t bit = ((lfsr >> 22) ^ (lfsr >> 17)) & 1;
-    lfsr = ((lfsr << 1) | bit) & 0x7FFFFF;
-    noiseState = lfsr;
+    uint32_t lfsr = nextNoise(noiseState);
     return ((int32_t)(lfsr & 0xFFF) - 2048) * kWaveAmp >> 11;
   }
   default:
@@ -244,6 +256,7 @@ void SynthVoice::Trigger(const VoiceParams &p, uint32_t baseInc, uint8_t n,
 
   if (retrigger) {
     op1_phase = op2_phase = op3_phase = 0;
+    sub_phase = 0;
     op1_env_stage = op2_env_stage = op3_env_stage = ENV_ATTACK;
     op1_env_level = op2_env_level = op3_env_level = 0;
     filt_env_stage = ENV_ATTACK;
@@ -270,9 +283,17 @@ void SynthVoice::Release() {
 bool SynthVoice::IsActive() const {
   if (!(voice_flags & SYNTH_VF_PLAYING))
     return false;
-  // Output ops are the carriers; once they are all OFF there is no sound.
-  return !(op1_env_stage == ENV_OFF && op2_env_stage == ENV_OFF &&
-           op3_env_stage == ENV_OFF);
+  // Output ops are the carriers; once they are all silent there is no sound.
+  // "Silent" is not only ENV_OFF: a patch with a sustain nibble of 0 (any
+  // pluck or percussive sound) decays to level 0 and then sits in
+  // ENV_SUSTAIN indefinitely. Treating that as active kept the voice
+  // rendering silence forever whenever a gate-off never arrived.
+  auto silent = [](uint8_t stage, uint16_t level) {
+    return stage == ENV_OFF || (stage == ENV_SUSTAIN && level == 0);
+  };
+  return !(silent(op1_env_stage, op1_env_level) &&
+           silent(op2_env_stage, op2_env_level) &&
+           silent(op3_env_stage, op3_env_level));
 }
 
 bool SynthVoice::RenderBlock(fixed *buffer, int size) {
@@ -321,9 +342,13 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
     lfo_phase += lfoInc;
     if (lfo_delay_timer > 0)
       lfo_delay_timer--;
-    // refresh S&H latch when the LFO phase wraps to a new period
-    if (p.lfo_shape == SYNTH_LFO_SH && lfo_phase < lfoPrev)
-      lfo_sh_value = (noise_state & 0xFFFF);
+    // Refresh the S&H latch when the LFO phase wraps to a new period.
+    // The LFSR must be stepped here rather than sampled: osc() only advances
+    // noise_state for a NOISE waveform, so on any other wave the latch would
+    // be re-read from an unchanging seed and S&H would be a DC offset.
+    if (p.lfo_shape == SYNTH_LFO_SH && lfo_phase < lfoPrev) {
+      lfo_sh_value = nextNoise(noise_state) & 0xFFFF;
+    }
 
     int32_t lfoRaw =
         lfoValue(lfo_phase, p.lfo_shape, lfo_sh_value, noise_state);
@@ -448,9 +473,9 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
       break;
     }
 
-    // sub oscillator: op1 an octave down (phase/2), cheap, no extra state
+    // sub oscillator: one octave below op1, from its own half-rate phase
     if (subLevel) {
-      int32_t subRaw = osc(op1_phase >> 1, SYNTH_WAVE_SINE, 0, noise_state);
+      int32_t subRaw = osc(sub_phase, SYNTH_WAVE_SINE, 0, noise_state);
       mix += ((subRaw * op1_env_level) >> 16) * subLevel >> 8;
     }
 
@@ -503,6 +528,7 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
     op1_phase += inc1;
     op2_phase += inc2;
     op3_phase += inc3;
+    sub_phase += inc1 >> 1; // one octave below op1
 
     // headroom + clip
     out >>= kOutShift;
