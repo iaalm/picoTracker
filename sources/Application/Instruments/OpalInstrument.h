@@ -100,6 +100,10 @@ public:
   virtual void ResetParam(int idx) override;
   virtual void ResetAllParams() override;
 
+  // algorithm / waveshapes / key-scale levels were CHAR_LIST Variables
+  // pre-migration; legacy .pti files store them as words.
+  const StringParam *StringParams(int &count) const override;
+
   void setChannel(uint8_t channel);
 
 private:

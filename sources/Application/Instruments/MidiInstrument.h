@@ -106,6 +106,10 @@ public:
   virtual void ResetParam(int idx) override;
   virtual void ResetAllParams() override;
 
+  // table automation was a BOOL Variable pre-migration; legacy .pti files
+  // store it as "true"/"false".
+  const StringParam *StringParams(int &count) const override;
+
   void SetChannel(int i);
   void SendProgramChange(int channel, int program);
   void SendProgramChangeWithNote(int channel, int program);

@@ -307,6 +307,19 @@ int OpalInstrument::GetParamBigStep(int idx) const {
   return SPECS[idx].big_step;
 }
 
+const I_Instrument::StringParam *
+OpalInstrument::StringParams(int &count) const {
+  static const StringParam kStringParams[] = {
+      {PARAM_ALGORITHM, algorithms, 2},
+      {PARAM_OP1_WAVESHAPE, waveShapes, 8},
+      {PARAM_OP1_KEYSCALE, kslValues, 4},
+      {PARAM_OP2_WAVESHAPE, waveShapes, 8},
+      {PARAM_OP2_KEYSCALE, kslValues, 4},
+  };
+  count = sizeof(kStringParams) / sizeof(kStringParams[0]);
+  return kStringParams;
+}
+
 void OpalInstrument::SetParamValue(int idx, int v) {
   if (idx < 0 || idx >= kParamCount) {
     return;

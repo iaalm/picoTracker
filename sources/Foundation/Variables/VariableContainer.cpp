@@ -16,6 +16,10 @@ VariableContainer::VariableContainer(etl::ivector<Variable *> *list)
 VariableContainer::~VariableContainer(){};
 
 Variable *VariableContainer::FindVariable(FourCC id) {
+  // Instruments migrated to packed parameter storage pass a null list.
+  if (!list_) {
+    return NULL;
+  }
   auto it = list_->begin();
   for (size_t i = 0; i < list_->size(); i++) {
     if ((*it)->GetID() == id) {
@@ -27,6 +31,9 @@ Variable *VariableContainer::FindVariable(FourCC id) {
 };
 
 Variable *VariableContainer::FindVariable(const char *name) {
+  if (!list_) {
+    return NULL;
+  }
   auto it = list_->begin();
   for (size_t i = 0; i < list_->size(); i++) {
     if (!strcmp((*it)->GetName(), name)) {

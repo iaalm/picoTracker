@@ -263,12 +263,23 @@ unsigned short InstrumentBank::Clone(unsigned short i) {
     return NO_MORE_INSTRUMENT;
   }
 
-  for (auto it = src->Variables()->begin(); it != src->Variables()->end();
-       it++) {
-    Variable *dstV = dst->FindVariable((*it)->GetID());
-    if (dstV) {
-      dstV->CopyFrom(**it);
+  // Copy parameters via the index-based API so this works for both packed
+  // storage instruments (Variables() == nullptr) and legacy ones. Index 0 is
+  // the reserved name slot, copied separately via SetName.
+  if (src->GetType() == dst->GetType()) {
+    dst->SetName(src->GetUserSetName().c_str());
+    int count = src->GetParamCount();
+    for (int idx = 1; idx < count; idx++) {
+      dst->SetParamValue(idx, src->GetParamValue(idx));
     }
+  }
+
+  // The sample reference is still a legacy Variable (see SampleInstrument
+  // docs/§9.4) and is not part of the packed parameter array.
+  Variable *srcSample = src->FindVariable(FourCC::SampleInstrumentSample);
+  Variable *dstSample = dst->FindVariable(FourCC::SampleInstrumentSample);
+  if (srcSample && dstSample) {
+    dstSample->CopyFrom(*srcSample);
   }
   return next;
 }

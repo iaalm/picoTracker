@@ -89,8 +89,9 @@ const ParamSpec SampleInstrument::SPECS[SampleInstrument::kParamCount] = {
     {FourCC::SampleInstrumentLoopStart, 0, 15, 1, 0, 0, 0xFFFF, 1, 0xFF, 0, 0},
     // [16] LoopEnd
     {FourCC::SampleInstrumentEnd, 0, 16, 1, 0, 0, 0xFFFF, 1, 0xFF, 0, 0},
-    // [17] Table (default -1 == "no table bound")
-    {FourCC::SampleInstrumentTable, 0, 17, 1, -1, 0, 0x7F, 1, 0x10, 0, 0},
+    // [17] Table (default/min -1 == "no table bound"; min must admit the
+    // sentinel or SetParamValue clamps every unbound table to 0)
+    {FourCC::SampleInstrumentTable, 0, 17, 1, -1, -1, 0x7F, 1, 0x10, 0, 0},
     // [18] TableAutomation (bool)
     {FourCC::SampleInstrumentTableAutomation, 0, 18, 1, 0, 0, 1, 1, 1, 0, 0},
 };
@@ -1136,14 +1137,10 @@ int SampleInstrument::GetSampleIndex() {
 };
 
 void SampleInstrument::SetVolume(int volume) {
-  Variable *v = FindVariable(FourCC::SampleInstrumentVolume);
-  v->SetInt(volume);
+  SetParamValue(PARAM_VOLUME, volume);
 };
 
-int SampleInstrument::GetVolume() {
-  Variable *v = FindVariable(FourCC::SampleInstrumentVolume);
-  return v->GetInt();
-};
+int SampleInstrument::GetVolume() { return params_[PARAM_VOLUME]; };
 
 int SampleInstrument::GetSampleSize(int channel) {
   if (source_) {
@@ -1189,12 +1186,11 @@ void SampleInstrument::updateInstrumentData(bool search) {
     }
   }
 
-  Variable *v = FindVariable(FourCC::SampleInstrumentEnd);
-  v->SetInt(instrSize);
-  v = FindVariable(FourCC::SampleInstrumentLoopStart);
-  v->SetInt(0);
-  v = FindVariable(FourCC::SampleInstrumentStart);
-  v->SetInt(0);
+  // end / loopstart / start are packed parameters now — FindVariable()
+  // returns null for them, so write them through the parameter API.
+  SetParamValue(PARAM_LOOP_END, instrSize);
+  SetParamValue(PARAM_LOOP_START, 0);
+  SetParamValue(PARAM_START, 0);
   clampSlicePoints(static_cast<uint32_t>(instrSize));
   dirty_ = false;
 };
@@ -1608,7 +1604,7 @@ void SampleInstrument::RestoreContent(PersistencyDocument *doc) {
         // 18 packed parameters: look up by name via the new API.
         int idx = FindParamByName(name.c_str());
         if (idx >= 0) {
-          SetParamValue(idx, atoi(value.c_str()));
+          SetParamValue(idx, ParseParamValue(idx, value.c_str()));
         } else {
           Trace::Error("Parameter '%s' not found in instrument", name.c_str());
         }
@@ -1625,6 +1621,10 @@ void SampleInstrument::RestoreContent(PersistencyDocument *doc) {
 }
 
 void SampleInstrument::Purge() {
+  // Reset the packed parameters as well as the legacy sample_ Variable —
+  // iterating variables_ alone only cleared sample_ and silently left all
+  // 18 migrated parameters at their previous values.
+  ResetAllParams();
   auto it = variables_.begin();
   for (size_t i = 0; i < variables_.size(); i++) {
     (*it)->Reset();
@@ -1635,7 +1635,7 @@ void SampleInstrument::Purge() {
 };
 bool SampleInstrument::IsEmpty() {
   Variable *v = FindVariable(FourCC::SampleInstrumentSample);
-  return (v->GetInt() == -1);
+  return v ? (v->GetInt() == -1) : true;
 };
 
 int SampleInstrument::GetTable() {
@@ -1722,6 +1722,18 @@ int SampleInstrument::GetParamBigStep(int idx) const {
     return 1;
   }
   return SPECS[idx].big_step;
+}
+
+const I_Instrument::StringParam *
+SampleInstrument::StringParams(int &count) const {
+  static const StringParam kStringParams[] = {
+      {PARAM_INTERPOLATION, interpolationTypes, 2},
+      {PARAM_FILTER_MODE, filterMode, FM_LAST},
+      {PARAM_LOOP_MODE, loopTypes, SILM_LAST},
+      {PARAM_TABLE_AUTO, nullptr, 0}, // BOOL
+  };
+  count = sizeof(kStringParams) / sizeof(kStringParams[0]);
+  return kStringParams;
 }
 
 void SampleInstrument::SetParamValue(int idx, int v) {

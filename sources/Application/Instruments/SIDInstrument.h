@@ -138,6 +138,10 @@ public:
   virtual void ResetParam(int idx) override;
   virtual void ResetAllParams() override;
 
+  // waveform was CHAR_LIST and vsync/ring/filter-on/table-automation were
+  // BOOLs pre-migration; legacy .pti files store them as words.
+  const StringParam *StringParams(int &count) const override;
+
   SIDInstrumentInstance GetChip() { return chip_; };
   unsigned short GetOsc() { return (unsigned short)params_[PARAM_OSC]; }
   void SetRender(bool render) { render_ = render; };

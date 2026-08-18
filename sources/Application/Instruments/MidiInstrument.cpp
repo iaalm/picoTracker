@@ -449,6 +449,15 @@ int MidiInstrument::GetParamBigStep(int idx) const {
   return SPECS[idx].big_step;
 }
 
+const I_Instrument::StringParam *
+MidiInstrument::StringParams(int &count) const {
+  static const StringParam kStringParams[] = {
+      {PARAM_TABLE_AUTO, nullptr, 0}, // BOOL
+  };
+  count = sizeof(kStringParams) / sizeof(kStringParams[0]);
+  return kStringParams;
+}
+
 void MidiInstrument::SetParamValue(int idx, int v) {
   if (idx < 0 || idx >= kParamCount) {
     return;

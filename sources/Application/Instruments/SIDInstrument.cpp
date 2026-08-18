@@ -61,8 +61,9 @@ const ParamSpec SIDInstrument::SPECS[SIDInstrument::kParamCount] = {
     {FourCC::SIDInstrumentADSR, 0, 5, 1, 0x2282, 0, 0xFFFF, 1, 0x10, 0, 0},
     // [6] FilterOn (bool)
     {FourCC::SIDInstrumentFilterOn, 0, 6, 1, 0, 0, 1, 1, 1, 0, 0},
-    // [7] Table (default -1 == "no table bound")
-    {FourCC::SIDInstrumentTable, 0, 7, 1, -1, 0, 0x7F, 1, 0x10, 0, 0},
+    // [7] Table (default/min -1 == "no table bound"; min must admit the
+    // sentinel or SetParamValue clamps every unbound table to 0)
+    {FourCC::SIDInstrumentTable, 0, 7, 1, -1, -1, 0x7F, 1, 0x10, 0, 0},
     // [8] TableAutomation (bool)
     {FourCC::SIDInstrumentTableAutomation, 0, 8, 1, 0, 0, 1, 1, 1, 0, 0},
     // [9] OSCNumber
@@ -395,6 +396,19 @@ int SIDInstrument::GetParamBigStep(int idx) const {
     return 1;
   }
   return SPECS[idx].big_step;
+}
+
+const I_Instrument::StringParam *
+SIDInstrument::StringParams(int &count) const {
+  static const StringParam kStringParams[] = {
+      {PARAM_VWF, sidWaveformText, DWF_LAST},
+      {PARAM_VSYNC, nullptr, 0},      // BOOL
+      {PARAM_VRING, nullptr, 0},      // BOOL
+      {PARAM_VFON, nullptr, 0},       // BOOL
+      {PARAM_TABLE_AUTO, nullptr, 0}, // BOOL
+  };
+  count = sizeof(kStringParams) / sizeof(kStringParams[0]);
+  return kStringParams;
 }
 
 void SIDInstrument::SetParamValue(int idx, int v) {

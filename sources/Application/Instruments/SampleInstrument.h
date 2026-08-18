@@ -90,14 +90,13 @@ public:
   virtual void GetTableState(TableSaveState &state);
   virtual void SetTableState(TableSaveState &state);
 
-  // Stage 4: returns a 1-element vector containing just `sample_`. The
-  // 18 migrated parameters live in the packed array and are *not* reachable
-  // through the legacy Variables() list — that path stays only because
-  // SampleInstrumentSample is still a legacy Variable (per docs/§9.4) and
-  // FindVariable(SampleInstrumentSample) is still called in a few places.
-  const etl::ivector<Variable *> *Variables() const override {
-    return &variables_;
-  }
+  // Returns nullptr like every other migrated instrument. `sample_` is still
+  // a legacy Variable and stays reachable via FindVariable() — which reads
+  // VariableContainer::list_, set from variables_ in the constructor — but it
+  // must NOT be exposed here: I_Instrument::SaveContent indexes Variables()
+  // with idx in [0, GetParamCount()) == [0, 19), and variables_ holds one
+  // element, so returning it read 18 entries past the end of the buffer.
+  const etl::ivector<Variable *> *Variables() const override { return nullptr; }
 
   bool IsMulti();
 
@@ -147,6 +146,11 @@ public:
   virtual int GetParamBigStep(int idx) const override;
   virtual int GetParamValue(int idx) const override { return params_[idx]; }
   virtual void SetParamValue(int idx, int v) override;
+
+  // interpol / filter mode / loop mode were CHAR_LIST Variables, and table
+  // automation a BOOL, before the packed-storage migration — legacy .pti
+  // files store them as words ("linear", "original", "pingpong", "false").
+  const StringParam *StringParams(int &count) const override;
   virtual bool IsParamModified(int idx) const override;
   virtual void ResetParam(int idx) override;
   virtual void ResetAllParams() override;
