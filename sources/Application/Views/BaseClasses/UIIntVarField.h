@@ -39,7 +39,7 @@ public:
   virtual void OnClick(){};
 
   virtual void ProcessClear();
-  virtual FourCC GetVariableID() const;
+  virtual FourCC GetVariableID() const override;
   virtual Variable &GetVariable();
 
   // Storage-model-agnostic accessors used by Draw/ProcessArrow/ProcessClear

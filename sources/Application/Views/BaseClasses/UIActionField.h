@@ -22,6 +22,7 @@ public:
   virtual void ProcessArrow(unsigned short mask){};
   virtual void OnClick();
   const char *GetString();
+  virtual FourCC GetVariableID() const override { return (FourCC)fourcc_; }
 
 protected:
   const char *name_;

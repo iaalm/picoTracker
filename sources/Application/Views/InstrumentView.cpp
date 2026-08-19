@@ -340,7 +340,7 @@ void InstrumentView::refreshInstrumentFields() {
   };
 
   for (auto field : fieldList_) {
-    if (((UIIntVarField *)field)->GetVariableID() == lastFocusID_) {
+    if (field->GetVariableID() == lastFocusID_) {
       SetFocus(field);
       break;
     }
@@ -1313,28 +1313,11 @@ FourCC InstrumentView::getFocusParamID() {
   if (!focus || focus->IsStatic()) {
     return FourCC::InstrumentCommandNone;
   }
-
-  for (auto &f : intVarField_) {
-    if (&f == focus) {
-      return f.GetVariableID();
-    }
-  }
-  for (auto &f : bigHexVarField_) {
-    if (&f == focus) {
-      return f.GetVariableID();
-    }
-  }
-  for (auto &f : intVarOffField_) {
-    if (&f == focus) {
-      return f.GetVariableID();
-    }
-  }
-  for (auto &f : bitmaskVarField_) {
-    if (&f == focus) {
-      return f.GetVariableID();
-    }
-  }
-  return FourCC::InstrumentCommandNone;
+  // GetVariableID() is virtual on UIField, so this covers the packed-parameter
+  // field types too. The previous version searched only the legacy field
+  // vectors, which meant it never matched for a migrated instrument — KX1's
+  // fields are all UIParam* — and the contextual legend was always blank.
+  return focus->GetVariableID();
 }
 
 void InstrumentView::printSynthParamHelp(FourCC param,

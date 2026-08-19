@@ -29,6 +29,7 @@ public:
   void OnClick();
   void OnEditClick();
   etl::string<MaxLength> GetString();
+  virtual FourCC GetVariableID() const override { return (FourCC)fourcc_; }
 
   // Set the variable this UITextField is bound to
   void SetVariable(Variable &v);
