@@ -22,8 +22,8 @@ public:
   UIParamIntVarField(const GUIPoint &position, I_Instrument *instr, int idx,
                      const char *format, int min, int max, int xOffset,
                      int yOffset, int displayOffset = 0)
-      : UIIntVarField(position, (Variable *)nullptr, format, min, max,
-                      xOffset, yOffset, displayOffset),
+      : UIIntVarField(position, (Variable *)nullptr, format, min, max, xOffset,
+                      yOffset, displayOffset),
         instr_(instr), idx_(idx) {}
 
   // --- Storage-model accessors. Override the parent's Variable-based defaults

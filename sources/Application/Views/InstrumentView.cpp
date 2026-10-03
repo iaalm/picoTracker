@@ -15,6 +15,7 @@
 #include "Application/Instruments/SamplePool.h"
 #include "Application/Instruments/SynthInstrument.h"
 #include "Application/Model/Config.h"
+#include "Application/Utils/SynthParamHelp.h"
 #include "Application/Views/ImportView.h"
 #include "Application/Views/SampleEditorView.h"
 #include "BaseClasses/UIBigHexVarField.h"
@@ -27,7 +28,6 @@
 #include "ModalDialogs/MessageBox.h"
 #include "ModalDialogs/TextInputModalView.h"
 #include "System/System/System.h"
-#include "Application/Utils/SynthParamHelp.h"
 #include <Application/Utils/stringutils.h>
 #include <cstdint>
 #include <cstring>
@@ -415,15 +415,15 @@ void InstrumentView::fillSampleParameters() {
   // 18 packed parameters routed through the new UIParam* classes.
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SampleInstrument::PARAM_VOLUME,
-      "volume: %d [%2.2X]", 0, 255, 1, 10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SampleInstrument::PARAM_VOLUME,
+                         "volume: %d [%2.2X]", 0, 255, 1, 10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SampleInstrument::PARAM_PAN, "pan: %2.2X", 0, 0xFE, 1,
-      0x10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SampleInstrument::PARAM_PAN,
+                         "pan: %2.2X", 0, 0xFE, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
@@ -442,8 +442,8 @@ void InstrumentView::fillSampleParameters() {
   // The right call is to switch to UIParamIntVarField with a %d format
   // here, and accept that the note-name rendering is dropped for stage 4.
   paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SampleInstrument::PARAM_ROOT_NOTE,
-      "root note: %d", 0, 0x7F, 1, 0x0C));
+      position, instrument, SampleInstrument::PARAM_ROOT_NOTE, "root note: %d",
+      0, 0x7F, 1, 0x0C));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
@@ -453,15 +453,15 @@ void InstrumentView::fillSampleParameters() {
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SampleInstrument::PARAM_DRIVE, "drive: %2.2X", 0,
-      0xFF, 1, 0x10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SampleInstrument::PARAM_DRIVE,
+                         "drive: %2.2X", 0, 0xFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SampleInstrument::PARAM_CRUSH, "crush: %d", 1, 0x10,
-      1, 4));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SampleInstrument::PARAM_CRUSH,
+                         "crush: %d", 1, 0x10, 1, 4));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
@@ -475,15 +475,15 @@ void InstrumentView::fillSampleParameters() {
   fieldList_.insert(fieldList_.end(), &(*staticField_.rbegin()));
 
   position._x += 13;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SampleInstrument::PARAM_CUTOFF, "%2.2X", 0, 0xFF, 1,
-      0x10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SampleInstrument::PARAM_CUTOFF,
+                         "%2.2X", 0, 0xFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._x += 3;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SampleInstrument::PARAM_RESO, "%2.2X", 0, 0xFF, 1,
-      0x10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SampleInstrument::PARAM_RESO,
+                         "%2.2X", 0, 0xFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._x -= 16;
@@ -496,8 +496,8 @@ void InstrumentView::fillSampleParameters() {
 
   position._y += 1;
   paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SampleInstrument::PARAM_FILTER_MODE, "Mode: %s", 0, 2,
-      1, 1));
+      position, instrument, SampleInstrument::PARAM_FILTER_MODE, "Mode: %s", 0,
+      2, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
@@ -508,8 +508,8 @@ void InstrumentView::fillSampleParameters() {
 
   position._y += 1;
   paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SampleInstrument::PARAM_LOOP_MODE,
-      "loop mode: %s", 0, SILM_LAST - 1, 1, 1));
+      position, instrument, SampleInstrument::PARAM_LOOP_MODE, "loop mode: %s",
+      0, SILM_LAST - 1, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
@@ -531,14 +531,14 @@ void InstrumentView::fillSampleParameters() {
   fieldList_.insert(fieldList_.end(), &(*paramBigHexVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarOffField_.emplace_back(UIParamIntVarOffField(
-      position, instrument, SampleInstrument::PARAM_TABLE, "table: %2.2X", 0x00,
-      TABLE_COUNT - 1, 1, 0x10));
+  paramIntVarOffField_.emplace_back(
+      UIParamIntVarOffField(position, instrument, SampleInstrument::PARAM_TABLE,
+                            "table: %2.2X", 0x00, TABLE_COUNT - 1, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarOffField_.rbegin()));
 
   paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SampleInstrument::PARAM_TABLE_AUTO, "auto: %s", 0, 1,
-      1, 1));
+      position, instrument, SampleInstrument::PARAM_TABLE_AUTO, "auto: %s", 0,
+      1, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 };
 
@@ -559,9 +559,9 @@ void InstrumentView::fillSIDParameters() {
   fieldList_.insert(fieldList_.end(), &(*staticField_.rbegin()));
 
   position._y += 2;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SIDInstrument::PARAM_OSC, "Oscillator:    %1.1X", 0,
-      0x2, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SIDInstrument::PARAM_OSC,
+                         "Oscillator:    %1.1X", 0, 0x2, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
@@ -589,9 +589,9 @@ void InstrumentView::fillSIDParameters() {
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 2;
-  paramBigHexVarField_.emplace_back(UIParamBigHexVarField(
-      position, instrument, SIDInstrument::PARAM_VADSR, 4,
-      "Env. A/D/S/R:  %4.4X", 0, 0xFFFF, 16, true));
+  paramBigHexVarField_.emplace_back(
+      UIParamBigHexVarField(position, instrument, SIDInstrument::PARAM_VADSR, 4,
+                            "Env. A/D/S/R:  %4.4X", 0, 0xFFFF, 16, true));
   fieldList_.insert(fieldList_.end(), &(*paramBigHexVarField_.rbegin()));
 
   position._y += 2;
@@ -636,9 +636,9 @@ void InstrumentView::fillSIDParameters() {
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(position, instrument,
-                                                   modeIdx, "  Mode:        %s", 0,
-                                                   DFM_LAST - 1, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, modeIdx, "  Mode:        %s", 0,
+                         DFM_LAST - 1, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 2;
@@ -658,39 +658,39 @@ void InstrumentView::fillMidiParameters() {
   // offset y to account for instrument type, name and export/import fields
   position._y += 3;
 
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, MidiInstrument::PARAM_CHANNEL,
-      "channel: %2.2d", 0, 0x0F, 1, 0x04, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, MidiInstrument::PARAM_CHANNEL,
+                         "channel: %2.2d", 0, 0x0F, 1, 0x04, 1));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
+
+  position._y += 1;
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, MidiInstrument::PARAM_VOLUME,
+                         "volume: %2.2X", 0, 0xFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
   paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, MidiInstrument::PARAM_VOLUME, "volume: %2.2X", 0,
-      0xFF, 1, 0x10));
+      position, instrument, MidiInstrument::PARAM_NOTE_LENGTH, "length: %2.2X",
+      0, 0xFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, MidiInstrument::PARAM_NOTE_LENGTH,
-      "length: %2.2X", 0, 0xFF, 1, 0x10));
-  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
-
-  position._y += 1;
-  paramIntVarOffField_.emplace_back(UIParamIntVarOffField(
-      position, instrument, MidiInstrument::PARAM_PROGRAM, "program: %2.2X", 0,
-      0x7F, 1, 0x10));
+  paramIntVarOffField_.emplace_back(
+      UIParamIntVarOffField(position, instrument, MidiInstrument::PARAM_PROGRAM,
+                            "program: %2.2X", 0, 0x7F, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarOffField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, MidiInstrument::PARAM_TABLE_AUTO,
-      "automation: %s", 0, 1, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, MidiInstrument::PARAM_TABLE_AUTO,
+                         "automation: %s", 0, 1, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarOffField_.emplace_back(UIParamIntVarOffField(
-      position, instrument, MidiInstrument::PARAM_TABLE, "table: %2.2X", 0,
-      0x7F, 1, 0x10));
+  paramIntVarOffField_.emplace_back(
+      UIParamIntVarOffField(position, instrument, MidiInstrument::PARAM_TABLE,
+                            "table: %2.2X", 0, 0x7F, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarOffField_.rbegin()));
 };
 
@@ -707,9 +707,9 @@ void InstrumentView::fillOpalParameters() {
   fieldList_.insert(fieldList_.end(), &(*staticField_.rbegin()));
 
   position._y += 2;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, OpalInstrument::PARAM_ALGORITHM,
-      "Algorithm:     %s", 0, 1, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, OpalInstrument::PARAM_ALGORITHM,
+                         "Algorithm:     %s", 0, 1, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
@@ -719,9 +719,9 @@ void InstrumentView::fillOpalParameters() {
   fieldList_.insert(fieldList_.end(), &(*paramBitmaskVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, OpalInstrument::PARAM_FEEDBACK,
-      "Feedback:      %1.1X", 0, 0x07, 1, 1, 0));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, OpalInstrument::PARAM_FEEDBACK,
+                         "Feedback:      %1.1X", 0, 0x07, 1, 1, 0));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 2;
@@ -749,9 +749,9 @@ void InstrumentView::fillOpalParameters() {
   }
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, OpalInstrument::PARAM_OP1_LEVEL,
-      "Level:         %2.2X", 0, 63, 1, 1, 0));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, OpalInstrument::PARAM_OP1_LEVEL,
+                         "Level:         %2.2X", 0, 63, 1, 1, 0));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   paramIntVarField_.emplace_back(UIParamIntVarField(
@@ -777,8 +777,8 @@ void InstrumentView::fillOpalParameters() {
   fieldList_.insert(fieldList_.end(), &(*paramBigHexVarField_.rbegin()));
 
   paramBigHexVarField_.emplace_back(UIParamBigHexVarField(
-      position + GUIPoint(20, 0), instrument, OpalInstrument::PARAM_OP2_ADSR,
-      4, "%4.4X", 0, 0xFFFF, 16, true));
+      position + GUIPoint(20, 0), instrument, OpalInstrument::PARAM_OP2_ADSR, 4,
+      "%4.4X", 0, 0xFFFF, 16, true));
   fieldList_.insert(fieldList_.end(), &(*paramBigHexVarField_.rbegin()));
 
   position._y += 1;
@@ -809,9 +809,9 @@ void InstrumentView::fillOpalParameters() {
       "Keyscale:      %s", 0, 3, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position + GUIPoint(20, 0), instrument, OpalInstrument::PARAM_OP2_KEYSCALE,
-      "%s", 0, 3, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position + GUIPoint(20, 0), instrument,
+                         OpalInstrument::PARAM_OP2_KEYSCALE, "%s", 0, 3, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   Trace::Error("OPAL fill done, total fields: %d", fieldList_.size());
@@ -829,15 +829,15 @@ void InstrumentView::fillSynthParameters() {
   fieldList_.insert(fieldList_.end(), &(*staticField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_ALGORITHM,
-      "route:    %s", 0, 4, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_ALGORITHM,
+                         "route:    %s", 0, 4, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_FEEDBACK,
-      "feedback: %1.1X", 0, 7, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_FEEDBACK,
+                         "feedback: %1.1X", 0, 7, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
@@ -852,27 +852,27 @@ void InstrumentView::fillSynthParameters() {
   fieldList_.insert(fieldList_.end(), &(*staticField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_OP1_WAVE, "wave:  %s", 0,
-      SYNTH_WAVE_LAST - 1, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_OP1_WAVE,
+                         "wave:  %s", 0, SYNTH_WAVE_LAST - 1, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_OP1_PW, "pw:    %3.3X", 0,
-      0xFFF, 1, 0x10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_OP1_PW,
+                         "pw:    %3.3X", 0, 0xFFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_OP1_LEVEL, "level: %2.2X", 0,
-      0xFF, 1, 0x10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_OP1_LEVEL,
+                         "level: %2.2X", 0, 0xFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
   paramBigHexVarField_.emplace_back(UIParamBigHexVarField(
-      position, instrument, SynthInstrument::PARAM_OP1_ADSR, 4,
-      "ADSR:  %4.4X", 0, 0xFFFF, 16, true));
+      position, instrument, SynthInstrument::PARAM_OP1_ADSR, 4, "ADSR:  %4.4X",
+      0, 0xFFFF, 16, true));
   fieldList_.insert(fieldList_.end(), &(*paramBigHexVarField_.rbegin()));
 
   // --- Operator 2 ---
@@ -881,15 +881,15 @@ void InstrumentView::fillSynthParameters() {
   fieldList_.insert(fieldList_.end(), &(*staticField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_OP2_WAVE, "wave:  %s", 0, 3,
-      1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_OP2_WAVE,
+                         "wave:  %s", 0, 3, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_OP2_RATIO, "ratio x:  %d", 0,
-      255, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_OP2_RATIO,
+                         "ratio x:  %d", 0, 255, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
@@ -898,20 +898,20 @@ void InstrumentView::fillSynthParameters() {
   // UI's ProcessArrow clamps to the field-level min/max. We pass the
   // -64..63 range directly to the field so scrolling behaves the same.
   paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_OP2_DETUNE,
-      "detune ct: %d", -64, 63, 1, 4));
+      position, instrument, SynthInstrument::PARAM_OP2_DETUNE, "detune ct: %d",
+      -64, 63, 1, 4));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_OP2_LEVEL, "level: %2.2X", 0,
-      0xFF, 1, 0x10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_OP2_LEVEL,
+                         "level: %2.2X", 0, 0xFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
   paramBigHexVarField_.emplace_back(UIParamBigHexVarField(
-      position, instrument, SynthInstrument::PARAM_OP2_ADSR, 4,
-      "ADSR:  %4.4X", 0, 0xFFFF, 16, true));
+      position, instrument, SynthInstrument::PARAM_OP2_ADSR, 4, "ADSR:  %4.4X",
+      0, 0xFFFF, 16, true));
   fieldList_.insert(fieldList_.end(), &(*paramBigHexVarField_.rbegin()));
 
   // --- Operator 3 ---
@@ -920,33 +920,33 @@ void InstrumentView::fillSynthParameters() {
   fieldList_.insert(fieldList_.end(), &(*staticField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_OP3_WAVE, "wave:  %s", 0, 3,
-      1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_OP3_WAVE,
+                         "wave:  %s", 0, 3, 1, 1));
+  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
+
+  position._y += 1;
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_OP3_RATIO,
+                         "ratio x:  %d", 0, 255, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
   paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_OP3_RATIO, "ratio x:  %d", 0,
-      255, 1, 1));
+      position, instrument, SynthInstrument::PARAM_OP3_DETUNE, "detune ct: %d",
+      -64, 63, 1, 4));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_OP3_DETUNE,
-      "detune ct: %d", -64, 63, 1, 4));
-  fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
-
-  position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_OP3_LEVEL, "level: %2.2X", 0,
-      0xFF, 1, 0x10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_OP3_LEVEL,
+                         "level: %2.2X", 0, 0xFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
   paramBigHexVarField_.emplace_back(UIParamBigHexVarField(
-      position, instrument, SynthInstrument::PARAM_OP3_ADSR, 4,
-      "ADSR:  %4.4X", 0, 0xFFFF, 16, true));
+      position, instrument, SynthInstrument::PARAM_OP3_ADSR, 4, "ADSR:  %4.4X",
+      0, 0xFFFF, 16, true));
   fieldList_.insert(fieldList_.end(), &(*paramBigHexVarField_.rbegin()));
 
   // --- Filter ---
@@ -961,15 +961,15 @@ void InstrumentView::fillSynthParameters() {
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_FLT_RESO,
-      "reso:     %1.1X", 0, 0xF, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_FLT_RESO,
+                         "reso:     %1.1X", 0, 0xF, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_FLT_MODE, "mode:     %s", 0,
-      SYNTH_FLT_LAST - 1, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_FLT_MODE,
+                         "mode:     %s", 0, SYNTH_FLT_LAST - 1, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
@@ -997,8 +997,8 @@ void InstrumentView::fillSynthParameters() {
 
   position._y += 1;
   paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_PITCH_DEPTH,
-      "depth st: %d", -128, 127, 1, 8));
+      position, instrument, SynthInstrument::PARAM_PITCH_DEPTH, "depth st: %d",
+      -128, 127, 1, 8));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
@@ -1013,21 +1013,21 @@ void InstrumentView::fillSynthParameters() {
   fieldList_.insert(fieldList_.end(), &(*staticField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_LFO_RATE, "rate:   %2.2X", 0,
-      0xFF, 1, 0x10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_LFO_RATE,
+                         "rate:   %2.2X", 0, 0xFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_LFO_SHAPE, "shape:  %s", 0,
-      SYNTH_LFO_LAST - 1, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_LFO_SHAPE,
+                         "shape:  %s", 0, SYNTH_LFO_LAST - 1, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_LFO_DEPTH, "depth:  %2.2X", 0,
-      0xFF, 1, 0x10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_LFO_DEPTH,
+                         "depth:  %2.2X", 0, 0xFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
@@ -1037,9 +1037,9 @@ void InstrumentView::fillSynthParameters() {
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_LFO_DELAY, "delay:  %2.2X", 0,
-      0xFF, 1, 0x10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_LFO_DELAY,
+                         "delay:  %2.2X", 0, 0xFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   // --- Misc ---
@@ -1054,41 +1054,41 @@ void InstrumentView::fillSynthParameters() {
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_HARD_SYNC,
-      "hard sync:  %s", 0, 1, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_HARD_SYNC,
+                         "hard sync:  %s", 0, 1, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_RING_MOD,
-      "ring mod:   %s", 0, 1, 1, 1));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_RING_MOD,
+                         "ring mod:   %s", 0, 1, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_SUB_LEVEL,
-      "sub level:  %2.2X", 0, 0xFF, 1, 0x10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_SUB_LEVEL,
+                         "sub level:  %2.2X", 0, 0xFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
-  paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_VOLUME, "volume:     %2.2X",
-      0, 0xFF, 1, 0x10));
+  paramIntVarField_.emplace_back(
+      UIParamIntVarField(position, instrument, SynthInstrument::PARAM_VOLUME,
+                         "volume:     %2.2X", 0, 0xFF, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 
   position._y += 1;
   // Table uses an "off" sentinel (-1 == no table). The legacy UI used
   // UIIntVarOffField; the new UIParamIntVarOffField mirrors that bound.
-  paramIntVarOffField_.emplace_back(UIParamIntVarOffField(
-      position, instrument, SynthInstrument::PARAM_TABLE, "table:      %2.2X",
-      0, TABLE_COUNT - 1, 1, 0x10));
+  paramIntVarOffField_.emplace_back(
+      UIParamIntVarOffField(position, instrument, SynthInstrument::PARAM_TABLE,
+                            "table:      %2.2X", 0, TABLE_COUNT - 1, 1, 0x10));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarOffField_.rbegin()));
 
   position._y += 1;
   paramIntVarField_.emplace_back(UIParamIntVarField(
-      position, instrument, SynthInstrument::PARAM_TABLE_AUTO,
-      "table auto: %s", 0, 1, 1, 1));
+      position, instrument, SynthInstrument::PARAM_TABLE_AUTO, "table auto: %s",
+      0, 1, 1, 1));
   fieldList_.insert(fieldList_.end(), &(*paramIntVarField_.rbegin()));
 }
 

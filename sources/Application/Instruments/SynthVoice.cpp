@@ -21,9 +21,9 @@
 namespace {
 
 constexpr int kSampleRate = 44100;
-constexpr int kSineBits = 10;            // 1024-entry sine table
+constexpr int kSineBits = 10;             // 1024-entry sine table
 constexpr int kSineSize = 1 << kSineBits; // 1024
-constexpr int kWaveAmp = 8192;           // operator output amplitude (+/-)
+constexpr int kWaveAmp = 8192;            // operator output amplitude (+/-)
 
 // How hard a modulator drives a carrier's phase. Higher = more aggressive FM.
 //
@@ -220,7 +220,8 @@ void SynthVoice::InitTables() {
     envRate[i] = (uint32_t)clampInt((int32_t)rate, 1, (int32_t)kEnvMax);
   }
 
-  // SVF cutoff coefficient table (exponential 20Hz .. fs/6), f = 2*sin(pi*fc/fs)
+  // SVF cutoff coefficient table (exponential 20Hz .. fs/6), f =
+  // 2*sin(pi*fc/fs)
   float fcMax = kSampleRate / 6.0f;
   for (int i = 0; i < 256; i++) {
     float fc = 20.0f * powf(fcMax / 20.0f, i / 255.0f);
@@ -230,8 +231,8 @@ void SynthVoice::InitTables() {
 
   // SVF damping: high resonance -> low damping (towards self oscillation).
   for (int i = 0; i < 16; i++) {
-    float q = 0.5f + i * 0.9f;          // Q from 0.5 .. ~14
-    float damp = 1.0f / q;              // damping
+    float q = 0.5f + i * 0.9f; // Q from 0.5 .. ~14
+    float damp = 1.0f / q;     // damping
     int32_t q1 = (int32_t)lrintf(damp * 32768.0f);
     resoCoef[i] = clampInt(q1, 256, 32768);
   }
@@ -375,7 +376,8 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
     // scaled lfo in [-lfoDepth, lfoDepth] range, Q?  (lfoRaw/32768 * depth)
     int32_t lfoScaled = (lfoRaw * lfoDepth) >> 8; // ~[-32768,32767]*depth/256
 
-    pitch_env_level = advancePitchEnv(pitch_env_stage, pitch_env_level, p.pitch_ad);
+    pitch_env_level =
+        advancePitchEnv(pitch_env_stage, pitch_env_level, p.pitch_ad);
 
     // --- pitch modulation -> increment multiplier (Q16) ---
     // pitch env (semitones) + lfo (if targeting pitch)
@@ -393,9 +395,12 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
     uint32_t inc3 = (uint32_t)(((uint64_t)inc1 * op3_inc_ratio) >> 16);
 
     // --- advance operator envelopes ---
-    op1_env_level = advanceEnv(op1_env_stage, op1_env_level, p.op1_ad, p.op1_sr);
-    op2_env_level = advanceEnv(op2_env_stage, op2_env_level, p.op2_ad, p.op2_sr);
-    op3_env_level = advanceEnv(op3_env_stage, op3_env_level, p.op3_ad, p.op3_sr);
+    op1_env_level =
+        advanceEnv(op1_env_stage, op1_env_level, p.op1_ad, p.op1_sr);
+    op2_env_level =
+        advanceEnv(op2_env_stage, op2_env_level, p.op2_ad, p.op2_sr);
+    op3_env_level =
+        advanceEnv(op3_env_stage, op3_env_level, p.op3_ad, p.op3_sr);
     filt_env_level =
         advanceEnv(filt_env_stage, filt_env_level, p.filt_ad, p.filt_sr);
 
@@ -419,11 +424,12 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
     // extra FM depth from lfo
     int32_t fmLfo = (p.lfo_target == SYNTH_LFO_TGT_FM) ? (lfoScaled << 6) : 0;
 
-    // --- compute operators (op3 first since it is always a modulator/source) ---
+    // --- compute operators (op3 first since it is always a modulator/source)
+    // ---
     int32_t fb3 = (p.feedback_op == 2) ? fbPhase : 0;
     int32_t o3raw = osc(op3_phase + fb3, p.op3_wave, 0, noise_state);
-    int32_t o3 = (o3raw * (int32_t)env3) >> 16;       // post-env
-    int32_t o3out = (o3 * p.op3_level) >> 8;          // post-level
+    int32_t o3 = (o3raw * (int32_t)env3) >> 16; // post-env
+    int32_t o3out = (o3 * p.op3_level) >> 8;    // post-level
 
     int32_t mod3 = ((int64_t)o3out * ((1 << kFMShift) + fmLfo)) >> 8;
 
@@ -468,7 +474,8 @@ bool SynthVoice::RenderBlock(fixed *buffer, int size) {
     int32_t o1out = (o1 * p.op1_level) >> 8;
 
     // feedback history is taken from the feedback operator's pre-level output
-    int32_t fbSource = (p.feedback_op == 2) ? o3 : (p.feedback_op == 1 ? o2 : o1);
+    int32_t fbSource =
+        (p.feedback_op == 2) ? o3 : (p.feedback_op == 1 ? o2 : o1);
     fb_history[1] = fb_history[0];
     fb_history[0] = fbSource;
 

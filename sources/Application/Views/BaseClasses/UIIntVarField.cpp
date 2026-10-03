@@ -127,9 +127,7 @@ Variable &UIIntVarField::GetVariable() { return *src_; };
 // from / write to a packed (I_Instrument *, idx) pair instead.
 // ---------------------------------------------------------------------------
 
-int UIIntVarField::ReadInt() const {
-  return src_ ? src_->GetInt() : 0;
-}
+int UIIntVarField::ReadInt() const { return src_ ? src_->GetInt() : 0; }
 
 void UIIntVarField::WriteInt(int v) {
   if (src_)
@@ -137,8 +135,7 @@ void UIIntVarField::WriteInt(int v) {
 }
 
 etl::string<MAX_VARIABLE_STRING_LENGTH> UIIntVarField::ReadString() const {
-  return src_ ? src_->GetString()
-              : etl::string<MAX_VARIABLE_STRING_LENGTH>();
+  return src_ ? src_->GetString() : etl::string<MAX_VARIABLE_STRING_LENGTH>();
 }
 
 Variable::Type UIIntVarField::ReadType() const {

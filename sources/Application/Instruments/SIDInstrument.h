@@ -68,23 +68,23 @@ public:
   // runtime hooks (Start / ProcessCommand) to read/write the packed array.
   enum ParamIdx {
     PARAM_NAME = 0,
-    PARAM_VPW = 1,           // PulseWidth
-    PARAM_VWF = 2,           // Waveform
-    PARAM_VSYNC = 3,         // VSync (bool)
-    PARAM_VRING = 4,         // RingMod (bool)
-    PARAM_VADSR = 5,         // ADSR
-    PARAM_VFON = 6,          // FilterOn (bool)
-    PARAM_TABLE = 7,         // Table
-    PARAM_TABLE_AUTO = 8,    // TableAutomation (bool)
-    PARAM_OSC = 9,           // OSCNumber
-    PARAM_FLTCUT_1 = 10,     // Filter Cut (SID1)
-    PARAM_FLTRES_1 = 11,     // Filter Resonance (SID1)
-    PARAM_FLTMODE_1 = 12,    // Filter Mode (SID1)
-    PARAM_VOL_1 = 13,        // Volume (SID1)
-    PARAM_FLTCUT_2 = 14,     // Filter Cut (SID2)
-    PARAM_FLTRES_2 = 15,     // Filter Resonance (SID2)
-    PARAM_FLTMODE_2 = 16,    // Filter Mode (SID2)
-    PARAM_VOL_2 = 17,        // Volume (SID2)
+    PARAM_VPW = 1,        // PulseWidth
+    PARAM_VWF = 2,        // Waveform
+    PARAM_VSYNC = 3,      // VSync (bool)
+    PARAM_VRING = 4,      // RingMod (bool)
+    PARAM_VADSR = 5,      // ADSR
+    PARAM_VFON = 6,       // FilterOn (bool)
+    PARAM_TABLE = 7,      // Table
+    PARAM_TABLE_AUTO = 8, // TableAutomation (bool)
+    PARAM_OSC = 9,        // OSCNumber
+    PARAM_FLTCUT_1 = 10,  // Filter Cut (SID1)
+    PARAM_FLTRES_1 = 11,  // Filter Resonance (SID1)
+    PARAM_FLTMODE_1 = 12, // Filter Mode (SID1)
+    PARAM_VOL_1 = 13,     // Volume (SID1)
+    PARAM_FLTCUT_2 = 14,  // Filter Cut (SID2)
+    PARAM_FLTRES_2 = 15,  // Filter Resonance (SID2)
+    PARAM_FLTMODE_2 = 16, // Filter Mode (SID2)
+    PARAM_VOL_2 = 17,     // Volume (SID2)
   };
 
   SIDInstrument(SIDInstrumentInstance chip);

@@ -28,8 +28,8 @@ enum InstrumentType {
   IT_SYNTH,
   IT_LAST
 };
-static const char *InstrumentTypeNames[IT_LAST] = {
-    "NONE", "SAMPLE", "MIDI", "SID", "OPAL", "KX1"};
+static const char *InstrumentTypeNames[IT_LAST] = {"NONE", "SAMPLE", "MIDI",
+                                                   "SID",  "OPAL",   "KX1"};
 
 // Map persisted TYPE attribute to enum (accepts legacy "SYNTH" saves).
 InstrumentType InstrumentTypeFromName(const char *name,

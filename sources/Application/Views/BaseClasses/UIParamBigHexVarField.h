@@ -16,9 +16,9 @@
 // See docs/instrument-param-api.md stage 0.6.
 class UIParamBigHexVarField : public UIBigHexVarField {
 public:
-  UIParamBigHexVarField(const GUIPoint &position, I_Instrument *instr,
-                        int idx, int precision, const char *format, int min,
-                        int max, int power, bool wrap = false)
+  UIParamBigHexVarField(const GUIPoint &position, I_Instrument *instr, int idx,
+                        int precision, const char *format, int min, int max,
+                        int power, bool wrap = false)
       : UIBigHexVarField(position, (Variable *)nullptr, precision, format, min,
                          max, power, wrap),
         instr_(instr), idx_(idx) {}

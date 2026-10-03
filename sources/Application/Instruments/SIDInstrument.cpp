@@ -71,12 +71,14 @@ const ParamSpec SIDInstrument::SPECS[SIDInstrument::kParamCount] = {
     // [10..13] SID1 filter/volume
     {FourCC::SIDInstrument1FilterCut, 0, 10, 1, 0x1FF, 0, 0x7FF, 1, 0x10, 0, 0},
     {FourCC::SIDInstrument1FilterResonance, 0, 11, 1, 0, 0, 0xF, 1, 1, 0, 0},
-    {FourCC::SIDInstrument1FilterMode, 0, 12, 1, 0, 0, DFM_LAST - 1, 1, 1, 0, 0},
+    {FourCC::SIDInstrument1FilterMode, 0, 12, 1, 0, 0, DFM_LAST - 1, 1, 1, 0,
+     0},
     {FourCC::SIDInstrument1Volume, 0, 13, 1, 0xF, 0, 0xF, 1, 1, 0, 0},
     // [14..17] SID2 filter/volume
     {FourCC::SIDInstrument2FilterCut, 0, 14, 1, 0x1FF, 0, 0x7FF, 1, 0x10, 0, 0},
     {FourCC::SIDInstrument2FilterResonance, 0, 15, 1, 0, 0, 0xF, 1, 1, 0, 0},
-    {FourCC::SIDInstrument2FilterMode, 0, 16, 1, 0, 0, DFM_LAST - 1, 1, 1, 0, 0},
+    {FourCC::SIDInstrument2FilterMode, 0, 16, 1, 0, 0, DFM_LAST - 1, 1, 1, 0,
+     0},
     {FourCC::SIDInstrument2Volume, 0, 17, 1, 0xF, 0, 0xF, 1, 1, 0, 0},
 };
 
@@ -229,12 +231,12 @@ bool SIDInstrument::Start(int c, unsigned char note, bool retrigger) {
 
   sid_->Register[0 + osc * 7] = sid_notes[note - 24] & 0xFF; // V1 Freq Lo
   sid_->Register[1 + osc * 7] = sid_notes[note - 24] >> 8;   // V1 Freq Hi
-  sid_->Register[2 + osc * 7] = vpw & 0xFF;                 // V1 PW Lo
-  sid_->Register[3 + osc * 7] = vpw >> 8;                   // V1 PW Hi
-  sid_->Register[4 + osc * 7] = vwf << 4 | vring << 2 | vsync << 1 |
-                                (int)gate_;             // V1 Control Reg
-  sid_->Register[5 + osc * 7] = vadsr >> 8;             // V1 Attack/Decay
-  sid_->Register[6 + osc * 7] = vadsr & 0xFF;           // V1 Sustain/Release
+  sid_->Register[2 + osc * 7] = vpw & 0xFF;                  // V1 PW Lo
+  sid_->Register[3 + osc * 7] = vpw >> 8;                    // V1 PW Hi
+  sid_->Register[4 + osc * 7] =
+      vwf << 4 | vring << 2 | vsync << 1 | (int)gate_; // V1 Control Reg
+  sid_->Register[5 + osc * 7] = vadsr >> 8;            // V1 Attack/Decay
+  sid_->Register[6 + osc * 7] = vadsr & 0xFF;          // V1 Sustain/Release
 
   // filter settings
   sid_->Register[21] = fltcut & 0x7; // Filter Cut lo
@@ -245,8 +247,8 @@ bool SIDInstrument::Start(int c, unsigned char note, bool retrigger) {
   //  bit while preserving the filter on bits of the other two oscillators for
   //  this chip
   sid_->Register[23] = (sid_->Register[23] & 0xF & ~(1 << osc)) |
-                       fltres << 4 |        // filter resonance
-                       vfon << osc;         // filter on bit for this osc
+                       fltres << 4 | // filter resonance
+                       vfon << osc;  // filter on bit for this osc
 
   int8_t mode = 0;
   switch (fltmode) {
@@ -398,8 +400,7 @@ int SIDInstrument::GetParamBigStep(int idx) const {
   return SPECS[idx].big_step;
 }
 
-const I_Instrument::StringParam *
-SIDInstrument::StringParams(int &count) const {
+const I_Instrument::StringParam *SIDInstrument::StringParams(int &count) const {
   static const StringParam kStringParams[] = {
       {PARAM_VWF, sidWaveformText, DWF_LAST},
       {PARAM_VSYNC, nullptr, 0},      // BOOL

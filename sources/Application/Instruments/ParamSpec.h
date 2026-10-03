@@ -9,8 +9,8 @@
 #ifndef _PARAM_SPEC_H_
 #define _PARAM_SPEC_H_
 
-#include <cstdint>
 #include "Foundation/Types/Types.h" // for FourCC
+#include <cstdint>
 
 // ---------------------------------------------------------------------------
 // ParamSpec — static metadata for one instrument parameter (Plan B,
@@ -31,17 +31,17 @@
 // `NAMES[SPECS[i].name_off]`.
 // ---------------------------------------------------------------------------
 struct ParamSpec {
-  FourCC  id;          // 1 B (1 byte pad follows for alignment)
+  FourCC id;           // 1 B (1 byte pad follows for alignment)
   uint8_t _pad0;       // 1 B
   uint16_t name_off;   // 2 B offset into per-class name string table
   uint16_t format_off; // 2 B offset into per-class format string table
-  int32_t  default_;   // 4 B (signed: -1 Table unbound, 0xF1C8 OPAL ADSR,
+  int32_t default_;    // 4 B (signed: -1 Table unbound, 0xF1C8 OPAL ADSR,
                        //            0xFFFF Synth LFODelay all fit comfortably)
-  int16_t  min;        // 2 B (signed: -1 for Table/Program "off" sentinel)
+  int16_t min;         // 2 B (signed: -1 for Table/Program "off" sentinel)
   uint16_t max;        // 2 B
-  uint8_t  step;       // 1 B
-  uint8_t  big_step;   // 1 B
-  uint8_t  _pad1;      // 1 B (alignment / future flags)
+  uint8_t step;        // 1 B
+  uint8_t big_step;    // 1 B
+  uint8_t _pad1;       // 1 B (alignment / future flags)
   uint8_t _pad2;       // 1 B (round struct to 4-byte alignment for default_)
 };
 #ifndef HOST_TEST

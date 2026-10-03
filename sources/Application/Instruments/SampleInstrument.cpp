@@ -64,7 +64,8 @@ const ParamSpec SampleInstrument::SPECS[SampleInstrument::kParamCount] = {
     // [3] Crush
     {FourCC::SampleInstrumentCrush, 0, 3, 1, 16, 0, 0x10, 1, 1, 0, 0},
     // [4] Drive
-    {FourCC::SampleInstrumentCrushVolume, 0, 4, 1, 0xFF, 0, 0xFF, 1, 0x10, 0, 0},
+    {FourCC::SampleInstrumentCrushVolume, 0, 4, 1, 0xFF, 0, 0xFF, 1, 0x10, 0,
+     0},
     // [5] Downsample
     {FourCC::SampleInstrumentDownsample, 0, 5, 1, 0, 0, 0xFFFF, 1, 1, 0, 0},
     // [6] RootNote
@@ -74,9 +75,11 @@ const ParamSpec SampleInstrument::SPECS[SampleInstrument::kParamCount] = {
     // [8] Pan
     {FourCC::SampleInstrumentPan, 0, 8, 1, 0x7F, 0, 0x7F, 1, 1, 0, 0},
     // [9] Cutoff
-    {FourCC::SampleInstrumentFilterCutOff, 0, 9, 1, 0xFF, 0, 0xFF, 1, 0x10, 0, 0},
+    {FourCC::SampleInstrumentFilterCutOff, 0, 9, 1, 0xFF, 0, 0xFF, 1, 0x10, 0,
+     0},
     // [10] Reso
-    {FourCC::SampleInstrumentFilterResonance, 0, 10, 1, 0, 0, 0xFF, 1, 0x10, 0, 0},
+    {FourCC::SampleInstrumentFilterResonance, 0, 10, 1, 0, 0, 0xFF, 1, 0x10, 0,
+     0},
     // [11] FilterMix
     {FourCC::SampleInstrumentFilterType, 0, 11, 1, 0, 0, 0xFF, 1, 0x10, 0, 0},
     // [12] FilterMode (CHAR_LIST, 4 entries)
@@ -84,7 +87,8 @@ const ParamSpec SampleInstrument::SPECS[SampleInstrument::kParamCount] = {
     // [13] Start
     {FourCC::SampleInstrumentStart, 0, 13, 1, 0, 0, 0xFFFF, 1, 0xFF, 0, 0},
     // [14] LoopMode (CHAR_LIST, 6 entries)
-    {FourCC::SampleInstrumentLoopMode, 0, 14, 1, 0, 0, SILM_LAST - 1, 1, 1, 0, 0},
+    {FourCC::SampleInstrumentLoopMode, 0, 14, 1, 0, 0, SILM_LAST - 1, 1, 1, 0,
+     0},
     // [15] LoopStart
     {FourCC::SampleInstrumentLoopStart, 0, 15, 1, 0, 0, 0xFFFF, 1, 0xFF, 0, 0},
     // [16] LoopEnd

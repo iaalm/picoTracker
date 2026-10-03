@@ -74,7 +74,8 @@ public:
     return (int)to_copy;
   }
 
-  virtual int Write(const void * /*ptr*/, int /*size*/, int /*nmemb*/) override {
+  virtual int Write(const void * /*ptr*/, int /*size*/,
+                    int /*nmemb*/) override {
     error_ = true;
     return 0;
   }

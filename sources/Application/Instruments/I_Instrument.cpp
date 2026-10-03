@@ -18,7 +18,8 @@ I_Instrument::~I_Instrument() {
   // Virtual destructor implementation
 }
 
-InstrumentType InstrumentTypeFromName(const char *name, InstrumentType unknown) {
+InstrumentType InstrumentTypeFromName(const char *name,
+                                      InstrumentType unknown) {
   if (!name || name[0] == '\0') {
     return unknown;
   }
@@ -74,8 +75,8 @@ void I_Instrument::SaveContent(tinyxml2::XMLPrinter *printer) {
       // Legacy path: preserve the exact existing on-disk format.
       printer->PushAttribute("VALUE", v->GetString().c_str());
     } else {
-      printer->PushAttribute("VALUE", FormatParamValue(idx, valueBuf,
-                                                       sizeof(valueBuf)));
+      printer->PushAttribute("VALUE",
+                             FormatParamValue(idx, valueBuf, sizeof(valueBuf)));
     }
     printer->CloseElement(); // PARAM
   }
@@ -339,9 +340,7 @@ bool I_Instrument::IsParamModified(int idx) const {
   return (*Variables())[idx]->IsModified();
 }
 
-void I_Instrument::ResetParam(int idx) {
-  (*Variables())[idx]->Reset();
-}
+void I_Instrument::ResetParam(int idx) { (*Variables())[idx]->Reset(); }
 
 void I_Instrument::ResetAllParams() {
   for (int i = 0; i < GetParamCount(); i++) {

@@ -76,7 +76,8 @@ const ParamSpec OpalInstrument::SPECS[OpalInstrument::kParamCount] = {
     // [14] Op2KeyScaleLevel (CHAR_LIST)
     {FourCC::OPALInstrumentOp2KeyScaleLevel, 0, 14, 1, 0, 0, 3, 1, 1, 0, 0},
     // [15] Op2TremVibSusKSR (4 bits)
-    {FourCC::OPALInstrumentOp2TremVibSusKSR, 0, 15, 1, 0x2, 0, 0x0F, 1, 1, 0, 0},
+    {FourCC::OPALInstrumentOp2TremVibSusKSR, 0, 15, 1, 0x2, 0, 0x0F, 1, 1, 0,
+     0},
 };
 
 const char *const OpalInstrument::NAMES[OpalInstrument::kParamCount] = {
@@ -99,8 +100,8 @@ const char *const OpalInstrument::NAMES[OpalInstrument::kParamCount] = {
 };
 
 const char *const OpalInstrument::FORMATS[OpalInstrument::kParamCount] = {
-    "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d",
-    "%d", "%d", "%d", "%d", "%d", "%d", "%d",
+    "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d",
+    "%d", "%d", "%d", "%d", "%d", "%d", "%d", "%d",
 };
 
 OpalInstrument::OpalInstrument() : I_Instrument(nullptr), breg(0) {
@@ -310,10 +311,8 @@ int OpalInstrument::GetParamBigStep(int idx) const {
 const I_Instrument::StringParam *
 OpalInstrument::StringParams(int &count) const {
   static const StringParam kStringParams[] = {
-      {PARAM_ALGORITHM, algorithms, 2},
-      {PARAM_OP1_WAVESHAPE, waveShapes, 8},
-      {PARAM_OP1_KEYSCALE, kslValues, 4},
-      {PARAM_OP2_WAVESHAPE, waveShapes, 8},
+      {PARAM_ALGORITHM, algorithms, 2},   {PARAM_OP1_WAVESHAPE, waveShapes, 8},
+      {PARAM_OP1_KEYSCALE, kslValues, 4}, {PARAM_OP2_WAVESHAPE, waveShapes, 8},
       {PARAM_OP2_KEYSCALE, kslValues, 4},
   };
   count = sizeof(kStringParams) / sizeof(kStringParams[0]);

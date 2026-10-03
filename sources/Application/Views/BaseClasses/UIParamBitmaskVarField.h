@@ -16,8 +16,8 @@
 // See docs/instrument-param-api.md stage 0.6.
 class UIParamBitmaskVarField : public UIBitmaskVarField {
 public:
-  UIParamBitmaskVarField(const GUIPoint &position, I_Instrument *instr,
-                         int idx, const char *format, int len)
+  UIParamBitmaskVarField(const GUIPoint &position, I_Instrument *instr, int idx,
+                         const char *format, int len)
       : UIBitmaskVarField(position, (Variable *)nullptr, format, len),
         instr_(instr), idx_(idx) {}
 

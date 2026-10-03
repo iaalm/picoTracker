@@ -367,9 +367,7 @@ etl::string<MAX_INSTRUMENT_NAME_LENGTH> MidiInstrument::GetDefaultName() {
   return name;
 }
 
-int MidiInstrument::GetTable() {
-  return params_[PARAM_TABLE];
-};
+int MidiInstrument::GetTable() { return params_[PARAM_TABLE]; };
 
 bool MidiInstrument::GetTableAutomation() {
   return params_[PARAM_TABLE_AUTO] != 0;

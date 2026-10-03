@@ -39,7 +39,7 @@ protected:
   int GetMaxScrollOffset() const;
   void DrawScrollBarIfNeeded();
 
-  static constexpr int kContentTop = 1; // first row below title bar
+  static constexpr int kContentTop = 1;     // first row below title bar
   static constexpr int kContentBottom = 23; // SCREEN_HEIGHT - 1
   int scrollOffset_ = 0;
 

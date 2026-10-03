@@ -15,11 +15,11 @@ const char *synthWaveNames[SYNTH_WAVE_LAST] = {"sine", "tri", "saw", "pulse",
                                                "noise"};
 const char *synthLFOShapeNames[SYNTH_LFO_LAST] = {"sine", "tri", "saw", "sqr",
                                                   "S&H"};
-const char *synthLFOTargetNames[SYNTH_LFO_TGT_LAST] = {
-    "pitch", "cutoff", "PW", "FM", "amp"};
+const char *synthLFOTargetNames[SYNTH_LFO_TGT_LAST] = {"pitch", "cutoff", "PW",
+                                                       "FM", "amp"};
 const char *synthFilterModeNames[SYNTH_FLT_LAST] = {"LP", "BP", "HP", "Notch"};
-const char *synthAlgorithmNames[5] = {
-    "[3]>[2]>[1]", "[2+3]>[1]", "[3]>[1]+2", "[3]>1,2", "[1+2+3]"};
+const char *synthAlgorithmNames[5] = {"[3]>[2]>[1]", "[2+3]>[1]", "[3]>[1]+2",
+                                      "[3]>1,2", "[1+2+3]"};
 
 SynthVoice SynthInstrument::voices_[SONG_CHANNEL_COUNT];
 
@@ -47,7 +47,8 @@ const ParamSpec SynthInstrument::SPECS[SynthInstrument::kParamCount] = {
     // [3] FeedbackOp
     {FourCC::SynthInstrumentFeedbackOp, 0, 3, 1, 0, 0, 2, 1, 1, 0, 0},
     // [4] Op1Wave (CHAR_LIST)
-    {FourCC::SynthInstrumentOp1Wave, 0, 4, 1, 0, 0, SYNTH_WAVE_LAST - 1, 1, 1, 0, 0},
+    {FourCC::SynthInstrumentOp1Wave, 0, 4, 1, 0, 0, SYNTH_WAVE_LAST - 1, 1, 1,
+     0, 0},
     // [5] Op1PW
     {FourCC::SynthInstrumentOp1PW, 0, 5, 1, 0x800, 0, 0xFFF, 1, 0x10, 0, 0},
     // [6] Op1Level
@@ -75,17 +76,20 @@ const ParamSpec SynthInstrument::SPECS[SynthInstrument::kParamCount] = {
     // [17] Op3ADSR
     {FourCC::SynthInstrumentOp3ADSR, 0, 17, 1, 0x00F8, 0, 0xFFFF, 1, 1, 0, 0},
     // [18] FilterCutoff
-    {FourCC::SynthInstrumentFilterCutoff, 0, 18, 1, 0xFFF, 0, 0xFFF, 1, 0x10, 0, 0},
+    {FourCC::SynthInstrumentFilterCutoff, 0, 18, 1, 0xFFF, 0, 0xFFF, 1, 0x10, 0,
+     0},
     // [19] FilterResonance
     {FourCC::SynthInstrumentFilterResonance, 0, 19, 1, 0, 0, 0xF, 1, 1, 0, 0},
     // [20] FilterMode (CHAR_LIST)
-    {FourCC::SynthInstrumentFilterMode, 0, 20, 1, 0, 0, SYNTH_FLT_LAST - 1, 1, 1, 0, 0},
+    {FourCC::SynthInstrumentFilterMode, 0, 20, 1, 0, 0, SYNTH_FLT_LAST - 1, 1,
+     1, 0, 0},
     // [21] FilterKeytrack
     {FourCC::SynthInstrumentFilterKeytrack, 0, 21, 1, 0, 0, 0xF, 1, 1, 0, 0},
     // [22] FilterEnvDepth (signed; negative = envelope closes the filter)
     {FourCC::SynthInstrumentFilterEnvDepth, 0, 22, 1, 0, -128, 127, 1, 8, 0, 0},
     // [23] FilterADSR
-    {FourCC::SynthInstrumentFilterADSR, 0, 23, 1, 0x00F8, 0, 0xFFFF, 1, 1, 0, 0},
+    {FourCC::SynthInstrumentFilterADSR, 0, 23, 1, 0x00F8, 0, 0xFFFF, 1, 1, 0,
+     0},
     // [24] PitchDepth (signed semitones; negative = downward sweep)
     {FourCC::SynthInstrumentPitchDepth, 0, 24, 1, 0, -128, 127, 1, 8, 0, 0},
     // [25] PitchAD
@@ -93,11 +97,13 @@ const ParamSpec SynthInstrument::SPECS[SynthInstrument::kParamCount] = {
     // [26] LFORate
     {FourCC::SynthInstrumentLFORate, 0, 26, 1, 0x40, 0, 0xFF, 1, 0x10, 0, 0},
     // [27] LFOShape (CHAR_LIST)
-    {FourCC::SynthInstrumentLFOShape, 0, 27, 1, 0, 0, SYNTH_LFO_LAST - 1, 1, 1, 0, 0},
+    {FourCC::SynthInstrumentLFOShape, 0, 27, 1, 0, 0, SYNTH_LFO_LAST - 1, 1, 1,
+     0, 0},
     // [28] LFODepth
     {FourCC::SynthInstrumentLFODepth, 0, 28, 1, 0, 0, 0xFF, 1, 0x10, 0, 0},
     // [29] LFOTarget (CHAR_LIST, default 1)
-    {FourCC::SynthInstrumentLFOTarget, 0, 29, 1, 1, 0, SYNTH_LFO_TGT_LAST - 1, 1, 1, 0, 0},
+    {FourCC::SynthInstrumentLFOTarget, 0, 29, 1, 1, 0, SYNTH_LFO_TGT_LAST - 1,
+     1, 1, 0, 0},
     // [30] LFODelay
     {FourCC::SynthInstrumentLFODelay, 0, 30, 1, 0, 0, 0xFFFF, 1, 0x10, 0, 0},
     // [31] Portamento
@@ -255,7 +261,7 @@ void SynthInstrument::Stop(int channel) {
 }
 
 bool SynthInstrument::Render(int channel, fixed *buffer, int size,
-                            bool updateTick) {
+                             bool updateTick) {
   PROFILE_SCOPE("SynthInstrument::Render");
   if (channel < 0 || channel >= SONG_CHANNEL_COUNT) {
     memset(buffer, 0, size * 2 * sizeof(fixed));
@@ -369,9 +375,9 @@ SynthInstrument::StringParams(int &count) const {
       {PARAM_FLT_MODE, synthFilterModeNames, SYNTH_FLT_LAST},
       {PARAM_LFO_SHAPE, synthLFOShapeNames, SYNTH_LFO_LAST},
       {PARAM_LFO_TARGET, synthLFOTargetNames, SYNTH_LFO_TGT_LAST},
-      {PARAM_HARD_SYNC, nullptr, 0},   // BOOL
-      {PARAM_RING_MOD, nullptr, 0},    // BOOL
-      {PARAM_TABLE_AUTO, nullptr, 0},  // BOOL
+      {PARAM_HARD_SYNC, nullptr, 0},  // BOOL
+      {PARAM_RING_MOD, nullptr, 0},   // BOOL
+      {PARAM_TABLE_AUTO, nullptr, 0}, // BOOL
   };
   count = sizeof(kStringParams) / sizeof(kStringParams[0]);
   return kStringParams;

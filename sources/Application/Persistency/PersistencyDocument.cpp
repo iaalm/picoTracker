@@ -279,8 +279,8 @@ bool PersistencyDocument::LoadFromBuffer(const uint8_t *data, size_t len) {
   for (size_t i = 0; i < len; ++i) {
     r_ = yxml_parse(state_, data[i]);
     if (r_ < YXML_OK) {
-      Trace::Error("PERSISTENCYDOCUMENT: buffer parse error %d at byte %zu",
-                   r_, i);
+      Trace::Error("PERSISTENCYDOCUMENT: buffer parse error %d at byte %zu", r_,
+                   i);
       return false;
     }
   }
@@ -298,8 +298,8 @@ bool PersistencyDocument::LoadFromBuffer(const uint8_t *data, size_t len) {
   memory_fp_.Init(data, len);
   fp_ = FileHandle(&memory_fp_);
 
-  Trace::Log("PERSISTENCYDOCUMENT",
-             "Successfully staged %zu bytes from buffer", len);
+  Trace::Log("PERSISTENCYDOCUMENT", "Successfully staged %zu bytes from buffer",
+             len);
   return true;
 }
 
