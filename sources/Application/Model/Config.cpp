@@ -705,8 +705,8 @@ bool Config::ImportTheme(const char *themeName) {
   auto fs = FileSystem::GetInstance();
 
   // Check if the filename already has the .ptt extension
-  etl::string<MAX_THEME_NAME_LENGTH + strlen(THEME_FILE_EXTENSION)> filename =
-      themeName;
+  etl::string<MAX_THEME_NAME_LENGTH + (sizeof(THEME_FILE_EXTENSION) - 1)>
+      filename = themeName;
   const char *extension = strrchr(themeName, '.');
   if (!extension || strcmp(extension, THEME_FILE_EXTENSION) != 0) {
     // Add .ptt extension only if it's not already there

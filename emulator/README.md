@@ -58,6 +58,87 @@ sed -i "s|^prefix=.*|prefix=$HOME/.local/sdl3|" ~/.local/sdl3/lib64/pkgconfig/sd
 
 Then build with `PKG_CONFIG_PATH=$HOME/.local/sdl3/lib64/pkgconfig`.
 
+## Building for the web (WebAssembly)
+
+The same sources build to WebAssembly with Emscripten, which ships its own
+SDL3 port — no host SDL3 is involved.
+
+```sh
+git clone https://github.com/emscripten-core/emsdk
+cd emsdk && ./emsdk install latest && ./emsdk activate latest
+source ./emsdk_env.sh
+
+cd /path/to/picoTracker
+emcmake cmake -S emulator -B build-web -DCMAKE_BUILD_TYPE=Release
+cmake --build build-web -j 4
+```
+
+The output is `build-web/picoTrackerSDL.{html,js,wasm,data}`. It must be
+served over HTTP (opening the `.html` from `file://` fails the `.data`
+fetch):
+
+```sh
+cd build-web && python3 -m http.server 8000
+# then open http://localhost:8000/picoTrackerSDL.html
+```
+
+### The SD card is baked in
+
+There is no `--sdroot` in a browser. The directory named by `PT_WEB_SDROOT`
+(default: `test_root/`) is packed into `picoTrackerSDL.data` at link time and
+mounted at `/sdcard` in MEMFS:
+
+```sh
+emcmake cmake -S emulator -B build-web -DPT_WEB_SDROOT=/path/to/sdcard
+```
+
+Two consequences worth knowing:
+
+* **Writes don't persist.** Saving a project modifies MEMFS, which is
+  discarded when the tab reloads. Nothing is written back to the host.
+* **CMake does not notice content changes** inside `PT_WEB_SDROOT` — only
+  the link step packs it. After editing files in that directory, force a
+  relink:
+
+  ```sh
+  rm -f build-web/picoTrackerSDL.data && cmake --build build-web
+  ```
+
+Which project opens is decided by the `.current` file in that directory, as
+on the device.
+
+### Browser specifics
+
+* A click is required before audio starts; the shell page shows a
+  "click to start" overlay because autoplay policy keeps the AudioContext
+  suspended until a user gesture.
+* The browser owns the event loop, so `MainLoop()` hands one frame at a time
+  back via `emscripten_set_main_loop` instead of blocking — see
+  `sdlEventManager::RunOneFrame`.
+* `--keys`, `--screenshot` and `--exit-after` are desktop-only (they come
+  from argv).
+
+### Headless verification
+
+Two scripts drive the web build through a real headless Chrome, which is the
+only way to check it: SDL3's web backend needs `window`, so plain Node can't
+run the module.
+
+```sh
+npx @puppeteer/browsers install chrome-headless-shell@stable --path .browser
+npm install --no-save puppeteer-core
+
+cd build-web && python3 -m http.server 8731 &
+node emulator/web/smoke.cjs      # renders? does the frame change on input?
+node emulator/web/audiocheck.cjs # do non-silent samples reach the output?
+```
+
+`smoke.cjs` screenshots the canvas element rather than reading the WebGL
+buffer back: the context has `preserveDrawingBuffer: false`, so a readback
+after present returns empty even while the UI draws correctly.
+`audiocheck.cjs` patches `AudioNode.connect` before the module loads — a tap
+installed afterwards misses SDL's connection and reports false silence.
+
 ## Running
 
 ```sh
@@ -135,3 +216,8 @@ The sample arena is deliberately capped at the device's 8 MB budget so that
   `Views/RecordView.cpp`, `Instruments/MacroInstrument.cpp`) include the pico
   adapter by path. That directory shadows those includes with host
   equivalents; if the layering leak is fixed upstream it can be deleted.
+* **Web: no persistence** — MEMFS is discarded on reload. Wiring up IDBFS
+  would fix this but hasn't been done.
+* **Web: single-threaded** — built without pthreads, so the mixer runs on the
+  main thread's audio callback. Fine for playback; it diverges further from
+  the device's core0/core1 split than the desktop build does.

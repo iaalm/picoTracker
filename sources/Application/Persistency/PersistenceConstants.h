@@ -14,9 +14,12 @@
 // Sample filenames include the ".wav" extension.
 #define MAX_INSTRUMENT_FILENAME_LENGTH 24
 #define MAX_THEME_NAME_LENGTH 16
+// sizeof-1 rather than strlen(): this is used as an etl::string<> template
+// argument, and only GCC folds strlen() on a literal into a constant
+// expression. Clang (macOS, emscripten) rejects it.
 #define MAX_THEME_EXPORT_PATH_LENGTH                                           \
-  (MAX_THEME_NAME_LENGTH + strlen(THEMES_DIR) + 1 +                            \
-   strlen(THEME_FILE_EXTENSION))
+  (MAX_THEME_NAME_LENGTH + (sizeof(THEMES_DIR) - 1) + 1 +                      \
+   (sizeof(THEME_FILE_EXTENSION) - 1))
 // accounts for .pti extension so they are 4 chars shorter.
 #define MAX_INSTRUMENT_NAME_LENGTH (MAX_INSTRUMENT_FILENAME_LENGTH - 4)
 

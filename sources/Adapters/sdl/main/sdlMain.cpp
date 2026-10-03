@@ -34,7 +34,13 @@ static void usage(const char *prog) {
 }
 
 int main(int argc, char *argv[]) {
+#ifdef __EMSCRIPTEN__
+  // Mount point of the --preload-file bundle; a browser has no real argv
+  // paths to point at an SD card.
+  const char *sdRoot = "/sdcard";
+#else
   const char *sdRoot = "test_root";
+#endif
   int scale = 2;
   uint32_t exitAfterMs = 0;
   const char *screenshotPath = NULL;

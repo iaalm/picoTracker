@@ -3,6 +3,7 @@
 */
 
 #include "common.h"
+#include <stddef.h> /* NULL -- common.h only reaches it via glibc's stdint.h */
 
 const char *sinc_get_name(int src_enum) {
   (void)src_enum;

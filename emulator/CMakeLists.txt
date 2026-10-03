@@ -25,11 +25,19 @@ project(picoTrackerSDL C CXX)
 
 set(PT_SOURCES ${CMAKE_CURRENT_LIST_DIR}/../sources)
 
-find_package(SDL3 QUIET)
-if(NOT SDL3_FOUND)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
-  add_library(SDL3::SDL3 ALIAS PkgConfig::SDL3)
+if(EMSCRIPTEN)
+  # Emscripten ships its own SDL3 port; find_package would pick up a host
+  # SDL3 and link the wrong ABI, so bypass it entirely.
+  add_library(SDL3::SDL3 INTERFACE IMPORTED)
+  target_compile_options(SDL3::SDL3 INTERFACE "-sUSE_SDL=3")
+  target_link_options(SDL3::SDL3 INTERFACE "-sUSE_SDL=3")
+else()
+  find_package(SDL3 QUIET)
+  if(NOT SDL3_FOUND)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
+    add_library(SDL3::SDL3 ALIAS PkgConfig::SDL3)
+  endif()
 endif()
 
 # Mirrors the device build's warning set so host builds catch the same
@@ -78,6 +86,38 @@ add_subdirectory(${PT_SOURCES}/Application ${CMAKE_BINARY_DIR}/Application)
 add_executable(picoTrackerSDL
   ${PT_SOURCES}/Adapters/sdl/main/sdlMain.cpp
 )
+
+if(EMSCRIPTEN)
+  # The SD card root is baked into the .data file at build time and mounted
+  # read-write in MEMFS. Writes (saving a project) therefore live only in the
+  # tab -- reloading the page discards them.
+  set(PT_WEB_SDROOT "${CMAKE_CURRENT_LIST_DIR}/../test_root"
+      CACHE PATH "Directory preloaded as the emulator's SD card root")
+  if(NOT EXISTS "${PT_WEB_SDROOT}")
+    message(FATAL_ERROR
+      "PT_WEB_SDROOT does not exist: ${PT_WEB_SDROOT}\n"
+      "Point it at an SD card root, e.g. -DPT_WEB_SDROOT=/path/to/test_root")
+  endif()
+
+  set_target_properties(picoTrackerSDL PROPERTIES SUFFIX ".html")
+
+  target_link_options(picoTrackerSDL PRIVATE
+    "-sUSE_SDL=3"
+    # The sample arena alone is a static 8MB; give the heap room up front so
+    # startup doesn't immediately trigger a grow-and-copy.
+    "-sINITIAL_MEMORY=134217728"
+    "-sALLOW_MEMORY_GROWTH=1"
+    "-sSTACK_SIZE=1048576"
+    # main() returns immediately under emscripten_set_main_loop; keep the
+    # runtime (and the preloaded filesystem) alive for the frame callbacks.
+    "-sEXIT_RUNTIME=0"
+    "-sASYNCIFY=0"
+    "--preload-file" "${PT_WEB_SDROOT}@/sdcard"
+    "--shell-file" "${CMAKE_CURRENT_LIST_DIR}/web/shell.html"
+  )
+  set_property(TARGET picoTrackerSDL APPEND PROPERTY LINK_DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/web/shell.html")
+endif()
 
 target_link_libraries(picoTrackerSDL PRIVATE
   sdl_adapter

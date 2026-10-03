@@ -1,0 +1,150 @@
+<!doctype html>
+<!--
+  Shell page for the WebAssembly build of the picoTracker emulator.
+
+  Two things here exist to satisfy browser rules rather than the tracker:
+   - the click-to-start overlay, because autoplay policy blocks AudioContext
+     until a user gesture;
+   - the keydown/keyup preventDefault, because arrows and space would
+     otherwise scroll the page out from under the canvas.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>picoTracker</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        background: #101014;
+        color: #c8c8d0;
+        font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+      }
+      h1 { font-size: 15px; font-weight: 600; margin: 18px 0 4px; }
+      #stage { position: relative; margin-top: 10px; }
+      canvas {
+        display: block;
+        background: #000;
+        /* No border: it would be added to the element box and SDL would
+           size the drawing buffer two pixels larger than the 640x480 grid. */
+        outline-offset: 0;
+        /* Explicit size: SDL's emscripten backend derives the drawing buffer
+           from the element's CSS box, which a flex parent would otherwise
+           collapse to a few pixels before the module starts. */
+        width: 640px;
+        height: 480px;
+        /* The UI is a 320x240 character grid; keep it crisp when upscaled. */
+        image-rendering: pixelated;
+        outline: none;
+      }
+      #overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: rgba(8, 8, 12, 0.88);
+        cursor: pointer;
+        text-align: center;
+      }
+      #overlay strong { font-size: 16px; color: #e8e8f0; }
+      #overlay span { font-size: 12px; color: #8a8a96; }
+      #overlay.hidden { display: none; }
+      #keys {
+        margin: 14px 0 28px;
+        color: #7a7a86;
+        font-size: 12px;
+        max-width: 640px;
+        text-align: center;
+      }
+      #keys code {
+        color: #b4b4c0;
+        background: #1c1c22;
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+      #status { min-height: 18px; color: #7a7a86; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>picoTracker &mdash; WebAssembly</h1>
+    <div id="status">loading&hellip;</div>
+
+    <div id="stage">
+      <canvas id="canvas" width="640" height="480" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+      <div id="overlay">
+        <strong>Click to start</strong>
+        <span>browsers require a click before audio can play</span>
+      </div>
+    </div>
+
+    <div id="keys">
+      <code>&larr;&uarr;&darr;&rarr;</code> navigate &middot;
+      <code>A</code>/<code>Z</code> ENTER &middot;
+      <code>S</code>/<code>X</code> EDIT &middot;
+      <code>Shift</code> ALT &middot;
+      <code>Ctrl</code> NAV &middot;
+      <code>Space</code> PLAY
+      <br />
+      Changes you make are kept in the tab only &mdash; reloading the page
+      restores the bundled SD card.
+    </div>
+
+    <script type="text/javascript">
+      var canvas = document.getElementById("canvas");
+      var overlay = document.getElementById("overlay");
+      var statusEl = document.getElementById("status");
+
+      // Arrows and space scroll the page by default, which moves the canvas
+      // while you are trying to play. SDL still sees the events.
+      var swallow = new Set([
+        "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Tab",
+      ]);
+      window.addEventListener(
+        "keydown",
+        function (e) {
+          if (swallow.has(e.code)) e.preventDefault();
+        },
+        { capture: true }
+      );
+
+      overlay.addEventListener("click", function () {
+        overlay.classList.add("hidden");
+        canvas.focus();
+        // Autoplay policy: the context starts suspended until a gesture.
+        if (typeof Module !== "undefined" && Module.SDL3 && Module.SDL3.audioContext) {
+          Module.SDL3.audioContext.resume();
+        }
+      });
+
+      var Module = {
+        canvas: canvas,
+        print: function (text) {
+          console.log(text);
+        },
+        printErr: function (text) {
+          console.warn(text);
+        },
+        setStatus: function (text) {
+          statusEl.textContent = text;
+          if (!text) {
+            statusEl.textContent = "ready";
+          }
+        },
+      };
+
+      window.onerror = function (msg) {
+        statusEl.textContent = "error: " + msg;
+        overlay.classList.remove("hidden");
+      };
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>

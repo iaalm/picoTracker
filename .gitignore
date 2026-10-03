@@ -46,3 +46,7 @@ AGENTS.md
 # binary fixtures. test_tf/ will hold committed curated fixtures (small).
 test_root/**
 test_fixtures_tmp/**
+# Emulator web build: the headless browser used by emulator/web/*.cjs and
+# the puppeteer-core install that drives it. Both are large and local-only.
+.browser/**
+node_modules/**

@@ -36,6 +36,11 @@ public:
   virtual void PostQuitMessage() override;
   virtual int GetKeyCode(const char *name) override;
 
+  // One iteration of the loop body. Public because the emscripten build
+  // drives it from a browser callback rather than from MainLoop().
+  void RunOneFrame();
+  bool IsFinished() const { return finished_; }
+
   // Headless/scripted runs: quit automatically after this many milliseconds,
   // optionally writing a screenshot first.
   static void SetExitAfterMs(uint32_t ms);
@@ -61,6 +66,11 @@ private:
   static uint32_t exitAfterMs_;
   static const char *screenshotPath_;
   static const char *keyScript_;
+
+  // Loop state, held across RunOneFrame() calls.
+  static uint64_t startMs_;
+  static uint64_t lastClockMs_;
+  static uint16_t lastMask_;
 };
 
 #endif

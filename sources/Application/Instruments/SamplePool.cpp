@@ -199,11 +199,12 @@ int SamplePool::ImportSample(const char *name, const char *projectName) {
   projectSamplePath.append(projectName);
   projectSamplePath.append("/samples/");
   projectSamplePath.append(projSampleFilename);
-  Status::SetMultiLine("Loading %s->\n%s", name, projSampleFilename);
+  Status::SetMultiLine("Loading %s->\n%s", name, projSampleFilename.c_str());
 
   auto fout = FileSystem::GetInstance()->Open(projectSamplePath.c_str(), "w");
   if (!fout) {
-    Trace::Error("Failed to open sample project file:%s", projectSamplePath);
+    Trace::Error("Failed to open sample project file:%s",
+                 projectSamplePath.c_str());
     return -1;
   };
 
@@ -217,7 +218,8 @@ int SamplePool::ImportSample(const char *name, const char *projectName) {
 
   if (!WavHeaderWriter::WriteHeader(fout.get(), outputSampleRate, channelCount,
                                     16)) {
-    Trace::Error("Failed to write WAV header for:%s", projectSamplePath);
+    Trace::Error("Failed to write WAV header for:%s",
+                 projectSamplePath.c_str());
     return -1;
   }
 
@@ -265,7 +267,8 @@ int SamplePool::ImportSample(const char *name, const char *projectName) {
       totalRead += bytesRead;
       uint32_t written = fout->Write(buffer, 1, bytesRead);
       if (written != bytesRead) {
-        Trace::Error("Failed writing sample data to:%s", projectSamplePath);
+        Trace::Error("Failed writing sample data to:%s",
+                     projectSamplePath.c_str());
         return -1;
       }
       totalWrittenFrames +=
@@ -311,7 +314,8 @@ int SamplePool::ImportSample(const char *name, const char *projectName) {
           uint32_t written =
               fout->Write(importResampleOutInt16_, 1, bytesToWrite);
           if (written != static_cast<uint32_t>(bytesToWrite)) {
-            Trace::Error("Failed writing sample data to:%s", projectSamplePath);
+            Trace::Error("Failed writing sample data to:%s",
+                         projectSamplePath.c_str());
             return -1;
           }
           totalWrittenFrames += data.output_frames_gen;
@@ -359,7 +363,8 @@ int SamplePool::ImportSample(const char *name, const char *projectName) {
       const int32_t bytesToWrite = outputSamples * sizeof(int16_t);
       uint32_t written = fout->Write(importResampleOutInt16_, 1, bytesToWrite);
       if (written != static_cast<uint32_t>(bytesToWrite)) {
-        Trace::Error("Failed writing sample data to:%s", projectSamplePath);
+        Trace::Error("Failed writing sample data to:%s",
+                     projectSamplePath.c_str());
         return -1;
       }
       totalWrittenFrames += data.output_frames_gen;
@@ -372,7 +377,8 @@ int SamplePool::ImportSample(const char *name, const char *projectName) {
           shouldResample ? totalWrittenFrames
                          : static_cast<uint32_t>(wav.GetSize(-1)),
           channelCount, 2)) {
-    Trace::Error("Failed to update WAV header for:%s", projectSamplePath);
+    Trace::Error("Failed to update WAV header for:%s",
+                 projectSamplePath.c_str());
     return -1;
   }
 

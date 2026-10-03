@@ -7,6 +7,12 @@
  */
 
 #include "sdlEventManager.h"
+#ifdef __EMSCRIPTEN__
+// Must precede the project headers: TinyXML2/tinyxml2adapter.h (pulled in
+// transitively by Config.h) does `#define FILE I_File` plus a batch of stdio
+// macros, which would rewrite emscripten.h's own declarations.
+#include <emscripten.h>
+#endif
 #include "Adapters/sdl/display/sdlchargfx.h"
 #include "Application/Model/Config.h"
 #include "Services/Midi/MidiService.h"
@@ -25,6 +31,9 @@ unsigned int sdlEventManager::keyKill_ = 5;
 uint32_t sdlEventManager::exitAfterMs_ = 0;
 const char *sdlEventManager::screenshotPath_ = NULL;
 const char *sdlEventManager::keyScript_ = NULL;
+uint64_t sdlEventManager::startMs_ = 0;
+uint64_t sdlEventManager::lastClockMs_ = 0;
+uint16_t sdlEventManager::lastMask_ = 0;
 
 void sdlEventManager::SetKeyScript(const char *script) { keyScript_ = script; }
 
@@ -170,69 +179,94 @@ void sdlEventManager::advanceKeyScript(uint64_t nowMs) {
   nextStepMs = nowMs + KEY_STEP_MS;
 }
 
+void sdlEventManager::RunOneFrame() {
+  processSDLEvents();
+  advanceKeyScript(SDL_GetTicks());
+
+  // Dispatch the diff against the previous frame. There's no bounce on a
+  // host keyboard, so unlike the device there is nothing to debounce --
+  // but we keep the auto-repeat behaviour the UI expects.
+  unsigned long now = System::GetInstance()->GetClock();
+  uint16_t sendMask =
+      (buttonMask_ ^ lastMask_) |
+      (buttonMask_ & (SDLKEY_LEFT | SDLKEY_RIGHT | SDLKEY_UP | SDLKEY_DOWN));
+
+  bool gotEvent = false;
+  if (buttonMask_ == lastMask_) {
+    if (isRepeating_ && ((now - time_) > keyRepeat_)) {
+      gotEvent = (sendMask != 0);
+    }
+    if (!isRepeating_ && ((now - time_) > keyDelay_)) {
+      gotEvent = (sendMask != 0);
+      if (gotEvent) {
+        isRepeating_ = true;
+      }
+    }
+  } else {
+    if ((now - time_) > keyKill_) {
+      gotEvent = (sendMask != 0);
+      if (gotEvent) {
+        isRepeating_ = false;
+      }
+    }
+  }
+
+  if (gotEvent) {
+    time_ = now;
+    sdlGUIWindowImp::ProcessButtonChange(sendMask, buttonMask_);
+    lastMask_ = buttonMask_;
+  }
+
+  // Drive the UI clock at the same ~30Hz the device uses.
+  uint64_t nowMs = SDL_GetTicks();
+  if ((nowMs - lastClockMs_) >= PICO_CLOCK_INTERVAL) {
+    lastClockMs_ = nowMs;
+    sdlGUIWindowImp::ProcessClockTick();
+    sdlGUIWindowImp::ProcessFlush();
+  }
+
+  if (exitAfterMs_ > 0 && (nowMs - startMs_) >= exitAfterMs_) {
+    if (screenshotPath_) {
+      sdlchargfx_present();
+      if (sdlchargfx_screenshot(screenshotPath_)) {
+        Trace::Log("SDL", "wrote screenshot to %s", screenshotPath_);
+      }
+    }
+    finished_ = true;
+  }
+}
+
+#ifdef __EMSCRIPTEN__
+// The browser owns the event loop: a C function that never returns would
+// starve rendering, input and audio, since all three are serviced by the
+// same JS task queue. So instead of blocking we hand one frame at a time
+// back to the browser and let it call us at display refresh rate.
+static void emFrame(void *arg) {
+  sdlEventManager *self = (sdlEventManager *)arg;
+  if (self->IsFinished()) {
+    emscripten_cancel_main_loop();
+    return;
+  }
+  self->RunOneFrame();
+}
+#endif
+
 int sdlEventManager::MainLoop() {
-  uint64_t startMs = SDL_GetTicks();
-  uint64_t lastClockMs = startMs;
-  uint16_t lastMask = 0;
+  startMs_ = SDL_GetTicks();
+  lastClockMs_ = startMs_;
+  lastMask_ = 0;
 
+#ifdef __EMSCRIPTEN__
+  // fps=0 means requestAnimationFrame; simulate_infinite_loop=1 unwinds the
+  // C stack here and returns control to the browser, so nothing after this
+  // call runs (shutdown happens on the quit path instead).
+  emscripten_set_main_loop_arg(emFrame, this, 0, 1);
+#else
   while (!finished_) {
-    processSDLEvents();
-    advanceKeyScript(SDL_GetTicks());
-
-    // Dispatch the diff against the previous frame. There's no bounce on a
-    // host keyboard, so unlike the device there is nothing to debounce --
-    // but we keep the auto-repeat behaviour the UI expects.
-    unsigned long now = System::GetInstance()->GetClock();
-    uint16_t sendMask =
-        (buttonMask_ ^ lastMask) |
-        (buttonMask_ & (SDLKEY_LEFT | SDLKEY_RIGHT | SDLKEY_UP | SDLKEY_DOWN));
-
-    bool gotEvent = false;
-    if (buttonMask_ == lastMask) {
-      if (isRepeating_ && ((now - time_) > keyRepeat_)) {
-        gotEvent = (sendMask != 0);
-      }
-      if (!isRepeating_ && ((now - time_) > keyDelay_)) {
-        gotEvent = (sendMask != 0);
-        if (gotEvent) {
-          isRepeating_ = true;
-        }
-      }
-    } else {
-      if ((now - time_) > keyKill_) {
-        gotEvent = (sendMask != 0);
-        if (gotEvent) {
-          isRepeating_ = false;
-        }
-      }
-    }
-
-    if (gotEvent) {
-      time_ = now;
-      sdlGUIWindowImp::ProcessButtonChange(sendMask, buttonMask_);
-      lastMask = buttonMask_;
-    }
-
-    // Drive the UI clock at the same ~30Hz the device uses.
-    uint64_t nowMs = SDL_GetTicks();
-    if ((nowMs - lastClockMs) >= PICO_CLOCK_INTERVAL) {
-      lastClockMs = nowMs;
-      sdlGUIWindowImp::ProcessClockTick();
-      sdlGUIWindowImp::ProcessFlush();
-    }
-
-    if (exitAfterMs_ > 0 && (nowMs - startMs) >= exitAfterMs_) {
-      if (screenshotPath_) {
-        sdlchargfx_present();
-        if (sdlchargfx_screenshot(screenshotPath_)) {
-          Trace::Log("SDL", "wrote screenshot to %s", screenshotPath_);
-        }
-      }
-      finished_ = true;
-    }
-
+    RunOneFrame();
     SDL_Delay(1);
   }
+#endif
   return 0;
 }
 

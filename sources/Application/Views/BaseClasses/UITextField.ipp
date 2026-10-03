@@ -1,6 +1,6 @@
 #include "Application/AppWindow.h"
-#include "View.h"
 #include "Application/Utils/stringutils.h"
+#include "View.h"
 
 template <uint8_t MaxLength>
 UITextField<MaxLength>::UITextField(
@@ -102,8 +102,8 @@ void UITextField<MaxLength>::ProcessArrow(unsigned short mask) {
       currentChar_ = 0;
       buffer = "A";
     } else {
-      buffer[currentChar_] = 
-        getNext(buffer.c_str()[currentChar_], mask == EPBM_DOWN);
+      buffer[currentChar_] =
+          getNext(buffer.c_str()[currentChar_], mask == EPBM_DOWN);
     }
     applyAndNotify();
     break;
@@ -130,7 +130,7 @@ void UITextField<MaxLength>::ProcessArrow(unsigned short mask) {
       // -1 to allow for adding 1 more char
     } else if (currentChar_ < (MaxLength - 1)) {
       currentChar_++;
-      char str[2] = {lastUsedChar_, 0};
+      char str[2] = {(char)lastUsedChar_, 0};
       buffer.append(str);
       applyAndNotify();
     }
@@ -139,7 +139,7 @@ void UITextField<MaxLength>::ProcessArrow(unsigned short mask) {
 
   // remember last used char for appending when user moves right at the end
   // of the string
-  lastUsedChar_= buffer.c_str()[currentChar_];
+  lastUsedChar_ = buffer.c_str()[currentChar_];
 };
 
 template <uint8_t MaxLength>
