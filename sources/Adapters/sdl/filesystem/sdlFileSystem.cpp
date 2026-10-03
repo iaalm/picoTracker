@@ -16,6 +16,8 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+// strcasecmp lives in <strings.h> on macOS/BSD; glibc also provides it here.
+#include <strings.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
