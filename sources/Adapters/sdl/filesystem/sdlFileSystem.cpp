@@ -256,8 +256,8 @@ void sdlFileSystem::list(etl::ivector<int> *fileIndexes, const char *filter,
     fileIndexes->push_back((int)i);
   }
 
-  Trace::Log("FILESYSTEM", "listed %d entries in %s",
-             (int)fileIndexes->size(), dirPath);
+  Trace::Log("FILESYSTEM", "listed %d entries in %s", (int)fileIndexes->size(),
+             dirPath);
 }
 
 void sdlFileSystem::getFileName(int index, char *name, int length) {
