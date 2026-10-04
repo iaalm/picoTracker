@@ -5,7 +5,7 @@
 // so a pad that updates the mask but never reaches the firmware fails here.
 const puppeteer = require("puppeteer-core");
 
-const URL = "http://127.0.0.1:8731/picoTrackerSDL.html";
+const URL = "http://127.0.0.1:8731/";
 const EXE =
   "/home/simon/Projects/picoTracker/.browser/chrome-headless-shell-linux64/chrome-headless-shell";
 

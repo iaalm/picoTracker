@@ -11,7 +11,7 @@
 // would look like a broken combo.
 const puppeteer = require("puppeteer-core");
 
-const URL = "http://127.0.0.1:8731/picoTrackerSDL.html";
+const URL = "http://127.0.0.1:8731/";
 const EXE =
   "/home/simon/Projects/picoTracker/.browser/chrome-headless-shell-linux64/chrome-headless-shell";
 

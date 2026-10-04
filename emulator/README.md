@@ -73,19 +73,20 @@ emcmake cmake -S emulator -B build-web -DCMAKE_BUILD_TYPE=Release
 cmake --build build-web -j 4
 ```
 
-The output is `build-web/picoTrackerSDL.{html,js,wasm,data}`. It must be
-served over HTTP (opening the `.html` from `file://` fails the `.data`
+The output is `build-web/dist/index.{html,js,wasm,data}` — a directory holding
+those four files and nothing else, so it can be served or published as-is. It
+must be served over HTTP (opening the `.html` from `file://` fails the `.data`
 fetch):
 
 ```sh
-cd build-web && python3 -m http.server 8000
-# then open http://localhost:8000/picoTrackerSDL.html
+cd build-web/dist && python3 -m http.server 8000
+# then open http://localhost:8000/
 ```
 
 ### The SD card is baked in
 
 There is no `--sdroot` in a browser. The directory named by `PT_WEB_SDROOT`
-(default: `test_root/`) is packed into `picoTrackerSDL.data` at link time and
+(default: `test_root/`) is packed into `dist/index.data` at link time and
 mounted at `/sdcard` in MEMFS:
 
 ```sh
@@ -101,7 +102,7 @@ Two consequences worth knowing:
   relink:
 
   ```sh
-  rm -f build-web/picoTrackerSDL.data && cmake --build build-web
+  rm -f build-web/dist/index.data && cmake --build build-web
   ```
 
 Which project opens is decided by the `.current` file in that directory, as
@@ -156,7 +157,7 @@ run the module.
 npx @puppeteer/browsers install chrome-headless-shell@stable --path .browser
 npm install --no-save puppeteer-core
 
-cd build-web && python3 -m http.server 8731 &
+cd build-web/dist && python3 -m http.server 8731 &
 node emulator/web/smoke.cjs      # renders? does the frame change on input?
 node emulator/web/audiocheck.cjs # do non-silent samples reach the output?
 node emulator/web/touchcheck.cjs # do two/three contacts produce one mask?

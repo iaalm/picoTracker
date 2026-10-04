@@ -101,6 +101,18 @@ if(EMSCRIPTEN)
 
   set_target_properties(picoTrackerSDL PROPERTIES SUFFIX ".html")
 
+  # Emscripten emits four sibling files (.html/.js/.wasm/.data) and CMake drops
+  # them next to the object tree by default. Send them to a directory of their
+  # own instead: that directory is then exactly the set of files a web server
+  # should expose, so it can be served directly -- no copy step, and no risk of
+  # publishing sources or .o files alongside them.
+  #
+  # The basename is `index` so the directory is servable as-is, without an
+  # index.html duplicated from the real page.
+  set_target_properties(picoTrackerSDL PROPERTIES
+    OUTPUT_NAME "index"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/dist")
+
   target_link_options(picoTrackerSDL PRIVATE
     "-sUSE_SDL=3"
     # The sample arena alone is a static 8MB; give the heap room up front so
