@@ -22,7 +22,7 @@
 #include <SDL3/SDL.h>
 
 bool sdlEventManager::finished_ = false;
-uint16_t sdlEventManager::buttonMask_ = 0;
+uint16_t sdlEventManager::keyMask_ = 0;
 bool sdlEventManager::isRepeating_ = false;
 unsigned long sdlEventManager::time_ = 0;
 unsigned int sdlEventManager::keyRepeat_ = 25;
@@ -34,6 +34,19 @@ const char *sdlEventManager::keyScript_ = NULL;
 uint64_t sdlEventManager::startMs_ = 0;
 uint64_t sdlEventManager::lastClockMs_ = 0;
 uint16_t sdlEventManager::lastMask_ = 0;
+uint16_t sdlEventManager::touchMask_ = 0;
+
+#ifdef __EMSCRIPTEN__
+// Called from the shell page's on-screen pad. The device keypad is a
+// bitmask and the UI relies on combos (ALT+arrow, NAV+arrow), so the pad
+// sends the full set of currently-held buttons rather than press/release
+// pairs: one assignment can't desync, and multi-touch falls out for free.
+extern "C" EMSCRIPTEN_KEEPALIVE void pt_set_touch_mask(int mask) {
+  sdlEventManager::SetTouchMask((uint16_t)mask);
+}
+#endif
+
+void sdlEventManager::SetTouchMask(uint16_t mask) { touchMask_ = mask; }
 
 void sdlEventManager::SetKeyScript(const char *script) { keyScript_ = script; }
 
@@ -100,11 +113,11 @@ void sdlEventManager::processSDLEvents() {
         finished_ = true;
         break;
       }
-      buttonMask_ |= scancodeToKeyMask(event.key.scancode);
+      keyMask_ |= scancodeToKeyMask(event.key.scancode);
       break;
     }
     case SDL_EVENT_KEY_UP:
-      buttonMask_ &= ~scancodeToKeyMask(event.key.scancode);
+      keyMask_ &= ~scancodeToKeyMask(event.key.scancode);
       break;
     default:
       break;
@@ -157,7 +170,7 @@ void sdlEventManager::advanceKeyScript(uint64_t nowMs) {
   const uint64_t KEY_STEP_MS = 120;
 
   if (pressed) {
-    buttonMask_ &= ~currentMask;
+    keyMask_ &= ~currentMask;
     pressed = false;
     nextStepMs = nowMs + KEY_STEP_MS;
     return;
@@ -172,7 +185,7 @@ void sdlEventManager::advanceKeyScript(uint64_t nowMs) {
   if (currentMask == 0) {
     Trace::Error("SDL: unknown key in --keys: %.*s", (int)len, cursor);
   } else {
-    buttonMask_ |= currentMask;
+    keyMask_ |= currentMask;
     pressed = true;
   }
   cursor = comma ? comma + 1 : cursor + len;
@@ -183,16 +196,21 @@ void sdlEventManager::RunOneFrame() {
   processSDLEvents();
   advanceKeyScript(SDL_GetTicks());
 
+  // Keyboard and on-screen pad are tracked separately and OR'd together, so
+  // releasing a key can't clear a button the pad is still holding (and vice
+  // versa).
+  const uint16_t buttonMask = keyMask_ | touchMask_;
+
   // Dispatch the diff against the previous frame. There's no bounce on a
   // host keyboard, so unlike the device there is nothing to debounce --
   // but we keep the auto-repeat behaviour the UI expects.
   unsigned long now = System::GetInstance()->GetClock();
   uint16_t sendMask =
-      (buttonMask_ ^ lastMask_) |
-      (buttonMask_ & (SDLKEY_LEFT | SDLKEY_RIGHT | SDLKEY_UP | SDLKEY_DOWN));
+      (buttonMask ^ lastMask_) |
+      (buttonMask & (SDLKEY_LEFT | SDLKEY_RIGHT | SDLKEY_UP | SDLKEY_DOWN));
 
   bool gotEvent = false;
-  if (buttonMask_ == lastMask_) {
+  if (buttonMask == lastMask_) {
     if (isRepeating_ && ((now - time_) > keyRepeat_)) {
       gotEvent = (sendMask != 0);
     }
@@ -213,8 +231,8 @@ void sdlEventManager::RunOneFrame() {
 
   if (gotEvent) {
     time_ = now;
-    sdlGUIWindowImp::ProcessButtonChange(sendMask, buttonMask_);
-    lastMask_ = buttonMask_;
+    sdlGUIWindowImp::ProcessButtonChange(sendMask, buttonMask);
+    lastMask_ = buttonMask;
   }
 
   // Drive the UI clock at the same ~30Hz the device uses.

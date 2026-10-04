@@ -41,6 +41,11 @@ public:
   void RunOneFrame();
   bool IsFinished() const { return finished_; }
 
+  // Full set of buttons the on-screen pad is currently holding. Tracked
+  // apart from the keyboard so the two sources can't clear each other, and
+  // set wholesale rather than per-button so multi-touch can't desync.
+  static void SetTouchMask(uint16_t mask);
+
   // Headless/scripted runs: quit automatically after this many milliseconds,
   // optionally writing a screenshot first.
   static void SetExitAfterMs(uint32_t ms);
@@ -56,7 +61,8 @@ private:
   void advanceKeyScript(uint64_t nowMs);
 
   static bool finished_;
-  static uint16_t buttonMask_;
+  static uint16_t keyMask_;
+  static uint16_t touchMask_;
   static bool isRepeating_;
   static unsigned long time_;
   static unsigned int keyRepeat_;

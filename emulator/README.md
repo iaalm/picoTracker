@@ -118,6 +118,34 @@ on the device.
 * `--keys`, `--screenshot` and `--exit-after` are desktop-only (they come
   from argv).
 
+### Touch (phones and tablets)
+
+On coarse-pointer devices the shell shows an on-screen keypad. It supports
+simultaneous presses, which the tracker needs: ALT+arrow and NAV+arrow are
+how you reach half the UI.
+
+The pad doesn't synthesise key events. It tracks which button each active
+pointer is over and pushes the whole set of held buttons into the firmware
+as a bitmask (`pt_set_touch_mask` → `sdlEventManager::SetTouchMask`), which
+is the same shape as the device keypad. Two consequences:
+
+* multi-touch works by construction — two fingers are two map entries that
+  OR together, and no press/release pair can desync the state;
+* keyboard and pad are kept in separate masks and OR'd per frame, so a
+  key-up can't clear a button the pad is still holding.
+
+Buttons are resolved by hit-testing the pointer position on every move
+rather than trusting the element that received `pointerdown`, so sliding
+between buttons behaves sensibly and a finger dragged off the pad releases
+instead of sticking.
+
+One constraint worth knowing if you touch the layout: the canvas's CSS box
+must stay an exact multiple of the 320×240 grid. SDL's emscripten backend
+derives the drawing buffer from the element's on-screen rect, so a
+percentage width or a CSS transform resizes the buffer itself (420×315 and
+404×303 respectively were observed) and the UI renders corrupted. `fitStage()`
+picks the largest integer multiple that fits.
+
 ### Headless verification
 
 Two scripts drive the web build through a real headless Chrome, which is the
@@ -131,6 +159,9 @@ npm install --no-save puppeteer-core
 cd build-web && python3 -m http.server 8731 &
 node emulator/web/smoke.cjs      # renders? does the frame change on input?
 node emulator/web/audiocheck.cjs # do non-silent samples reach the output?
+node emulator/web/touchcheck.cjs # do two/three contacts produce one mask?
+node emulator/web/padui.cjs      # does a pad press actually move the UI?
+node emulator/web/combocheck.cjs # does NAV+UP switch screens?
 ```
 
 `smoke.cjs` screenshots the canvas element rather than reading the WebGL
@@ -138,6 +169,13 @@ buffer back: the context has `preserveDrawingBuffer: false`, so a readback
 after present returns empty even while the UI draws correctly.
 `audiocheck.cjs` patches `AudioNode.connect` before the module loads — a tap
 installed afterwards misses SDL's connection and reports false silence.
+The touch scripts drive CDP's `Input.dispatchTouchEvent` directly, because
+puppeteer's own touchscreen helper models a single contact and so cannot
+express a combo.
+
+`combocheck.cjs` uses NAV+UP rather than NAV+RIGHT deliberately: NAV+RIGHT
+opens the chain under the cursor and correctly does nothing when that cell
+is empty, which on the bundled project looks identical to a broken combo.
 
 ## Running
 

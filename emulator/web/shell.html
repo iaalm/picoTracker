@@ -11,7 +11,12 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- user-scalable=no: a two-finger combo on the pad would otherwise
+         pinch-zoom the page instead of pressing two buttons. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, user-scalable=no"
+    />
     <title>picoTracker</title>
     <style>
       :root { color-scheme: dark; }
@@ -42,6 +47,15 @@
         image-rendering: pixelated;
         outline: none;
       }
+      /* Narrow screens: the canvas box is resized by fitStage() to an exact
+         multiple of the 320x240 grid. SDL's emscripten backend derives the
+         drawing buffer from the element's on-screen rect, so the box has to
+         stay grid-aligned -- a percentage width (420x315) or a CSS
+         transform (404x303) produces a buffer the grid doesn't divide into,
+         and the UI renders corrupted. */
+      @media (max-width: 700px) {
+        body { align-items: center; }
+      }
       #overlay {
         position: absolute;
         inset: 0;
@@ -71,6 +85,53 @@
         border-radius: 3px;
       }
       #status { min-height: 18px; color: #7a7a86; font-size: 12px; }
+
+      /* On-screen pad. Shown on coarse-pointer devices (phones, tablets);
+         a mouse/keyboard user gets the keyboard instead. */
+      #pad { display: none; }
+      @media (pointer: coarse), (max-width: 700px) {
+        #pad {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 16px;
+          width: 100%;
+          max-width: 640px;
+          padding: 16px 12px 24px;
+          box-sizing: border-box;
+        }
+      }
+      #dpad {
+        display: grid;
+        grid-template-areas: ". u ." "l . r" ". d .";
+        gap: 6px;
+      }
+      #actions { display: flex; flex-direction: column; gap: 6px; }
+      #actions .row { display: flex; gap: 6px; }
+      .key {
+        /* 56px keeps every target above the ~44px minimum touch size. */
+        min-width: 56px;
+        min-height: 56px;
+        font: inherit;
+        font-size: 12px;
+        color: #c8c8d0;
+        background: #22222b;
+        border: 1px solid #34343f;
+        border-radius: 8px;
+        /* Stop the browser from treating taps as scroll/zoom/selection
+           gestures, which would otherwise swallow or delay them. */
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .key.wide { min-width: 118px; }
+      .key.mod { background: #1b2430; }
+      .key.on {
+        background: #3b6ea5;
+        border-color: #5b8fc7;
+        color: #fff;
+      }
     </style>
   </head>
   <body>
@@ -82,6 +143,28 @@
       <div id="overlay">
         <strong>Click to start</strong>
         <span>browsers require a click before audio can play</span>
+      </div>
+    </div>
+
+    <div id="pad" aria-hidden="true">
+      <div id="dpad">
+        <button class="key" data-key="up"    style="grid-area:u">&uarr;</button>
+        <button class="key" data-key="left"  style="grid-area:l">&larr;</button>
+        <button class="key" data-key="right" style="grid-area:r">&rarr;</button>
+        <button class="key" data-key="down"  style="grid-area:d">&darr;</button>
+      </div>
+      <div id="actions">
+        <div class="row">
+          <button class="key mod" data-key="nav">NAV</button>
+          <button class="key mod" data-key="alt">ALT</button>
+        </div>
+        <div class="row">
+          <button class="key" data-key="enter">ENTER</button>
+          <button class="key" data-key="edit">EDIT</button>
+        </div>
+        <div class="row">
+          <button class="key wide" data-key="play">PLAY</button>
+        </div>
       </div>
     </div>
 
@@ -144,6 +227,122 @@
         statusEl.textContent = "error: " + msg;
         overlay.classList.remove("hidden");
       };
+
+      // --- fit the canvas to narrow screens ------------------------------
+      //
+      // SDL's emscripten backend sizes the drawing buffer from the canvas's
+      // on-screen rect, so the rect must stay an exact multiple of the
+      // 320x240 character grid -- otherwise the buffer is a size the grid
+      // doesn't divide into and the UI renders corrupted. Pick the largest
+      // integer multiple that fits the viewport instead of scaling freely.
+      var stage = document.getElementById("stage");
+
+      function fitStage() {
+        var avail = window.innerWidth - 16;
+        var mult = Math.max(1, Math.min(2, Math.floor(avail / 320)));
+        canvas.style.width = 320 * mult + "px";
+        canvas.style.height = 240 * mult + "px";
+      }
+
+      fitStage();
+      window.addEventListener("resize", fitStage);
+      window.addEventListener("orientationchange", fitStage);
+
+      // --- on-screen pad -------------------------------------------------
+      //
+      // Bit layout must match SDLKeypadBits in sdlEventManager.h, which in
+      // turn matches the device keypad.
+      var BITS = {
+        left: 1 << 0, down: 1 << 1, right: 1 << 2, up: 1 << 3,
+        alt: 1 << 4, edit: 1 << 5, enter: 1 << 6, nav: 1 << 7,
+        play: 1 << 8,
+      };
+
+      var padEl = document.getElementById("pad");
+      var buttons = Array.prototype.slice.call(
+        padEl.querySelectorAll(".key")
+      );
+
+      // Which button each active pointer is over. Keyed by pointerId, so two
+      // fingers are two independent entries -- that is what makes combos
+      // like ALT+LEFT work. Resolving by hit-test on every move (rather than
+      // trusting the element that got pointerdown) also means sliding from
+      // one button onto another does the expected thing, and a finger that
+      // leaves the pad releases instead of sticking.
+      var held = new Map();
+      var lastSent = -1;
+
+      function sendMask() {
+        var mask = 0;
+        held.forEach(function (name) {
+          mask |= BITS[name] || 0;
+        });
+        if (mask === lastSent) return;
+        lastSent = mask;
+
+        buttons.forEach(function (b) {
+          b.classList.toggle("on", (mask & BITS[b.dataset.key]) !== 0);
+        });
+
+        // Before the runtime is up there is nothing to receive this; the pad
+        // is hidden behind the overlay until then anyway.
+        if (typeof Module !== "undefined" && Module._pt_set_touch_mask) {
+          Module._pt_set_touch_mask(mask);
+        }
+      }
+
+      function buttonAt(x, y) {
+        var el = document.elementFromPoint(x, y);
+        if (!el) return null;
+        var key = el.closest ? el.closest(".key") : null;
+        return key ? key.dataset.key : null;
+      }
+
+      function onDown(e) {
+        var name = buttonAt(e.clientX, e.clientY);
+        if (!name) return;
+        // Keep receiving moves for this finger even if it strays outside the
+        // element, so the matching pointerup is never missed.
+        if (e.target.setPointerCapture) {
+          try {
+            e.target.setPointerCapture(e.pointerId);
+          } catch (err) {}
+        }
+        held.set(e.pointerId, name);
+        sendMask();
+        e.preventDefault();
+      }
+
+      function onMove(e) {
+        if (!held.has(e.pointerId)) return;
+        var name = buttonAt(e.clientX, e.clientY);
+        if (name !== held.get(e.pointerId)) {
+          if (name) held.set(e.pointerId, name);
+          else held.delete(e.pointerId);
+          sendMask();
+        }
+        e.preventDefault();
+      }
+
+      function onUp(e) {
+        if (!held.delete(e.pointerId)) return;
+        sendMask();
+        e.preventDefault();
+      }
+
+      padEl.addEventListener("pointerdown", onDown);
+      // Move/up go on window: with pointer capture the events are retargeted,
+      // and a finger lifted off the pad still has to clear its bit.
+      window.addEventListener("pointermove", onMove, { passive: false });
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+      // A tab switch mid-press would otherwise leave buttons stuck down.
+      window.addEventListener("blur", function () {
+        if (held.size) {
+          held.clear();
+          sendMask();
+        }
+      });
     </script>
     {{{ SCRIPT }}}
   </body>

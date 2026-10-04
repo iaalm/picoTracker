@@ -112,6 +112,9 @@ if(EMSCRIPTEN)
     # runtime (and the preloaded filesystem) alive for the frame callbacks.
     "-sEXIT_RUNTIME=0"
     "-sASYNCIFY=0"
+    # The shell page's touch pad calls into the event manager directly.
+    "-sEXPORTED_FUNCTIONS=['_main','_pt_set_touch_mask']"
+    "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
     "--preload-file" "${PT_WEB_SDROOT}@/sdcard"
     "--shell-file" "${CMAKE_CURRENT_LIST_DIR}/web/shell.html"
   )
