@@ -16,6 +16,8 @@
 #include "UIFramework/SimpleBaseClasses/GUIWindow.h"
 #include "View.h"
 
+class Variable;
+
 class UIField {
 public:
   UIField(const GUIPoint &position);
@@ -46,6 +48,19 @@ public:
   // vtable in flash. It is undefined behaviour that happens to survive only
   // as long as the link layout stays lucky.
   virtual FourCC GetVariableID() const { return FourCC::Default; }
+
+  // The Variable this field edits, or nullptr for fields that edit none.
+  //
+  // Same reasoning as GetVariableID() above, and the same bug: callers held
+  // UIField* and C-cast to UIIntVarField* to reach GetVariable(). On a field
+  // that is not a UIIntVarField — a UITextField, say — that call indexes past
+  // the end of the vtable. On the device it happened to survive; compiled to
+  // WebAssembly, where an indirect call is bounds- and signature-checked, it
+  // traps outright ("Out of bounds call_indirect").
+  //
+  // Returns a pointer rather than a reference so "no variable" is
+  // representable and callers are forced to check.
+  virtual Variable *GetVariablePtr() { return nullptr; }
 
 protected:
   uint8_t x_;

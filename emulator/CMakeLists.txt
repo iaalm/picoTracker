@@ -130,6 +130,21 @@ if(EMSCRIPTEN)
     "--preload-file" "${PT_WEB_SDROOT}@/sdcard"
     "--shell-file" "${CMAKE_CURRENT_LIST_DIR}/web/shell.html"
   )
+
+  # A wasm trap in a Release build reports only "Out of bounds call_indirect"
+  # with no hint of which call site. -DPT_WEB_DEBUG=ON turns on the runtime
+  # checks that name the function and keep a readable stack, at a large cost
+  # in size and speed -- for diagnosis, not for publishing.
+  option(PT_WEB_DEBUG "Add emscripten runtime checks to the web build" OFF)
+  if(PT_WEB_DEBUG)
+    target_link_options(picoTrackerSDL PRIVATE
+      "-sASSERTIONS=2"
+      "-sSAFE_HEAP=1"
+      "-sSTACK_OVERFLOW_CHECK=2"
+      "-fsanitize=undefined"
+    )
+    target_compile_options(picoTrackerSDL PRIVATE "-fsanitize=undefined")
+  endif()
   set_property(TARGET picoTrackerSDL APPEND PROPERTY LINK_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/web/shell.html")
 endif()

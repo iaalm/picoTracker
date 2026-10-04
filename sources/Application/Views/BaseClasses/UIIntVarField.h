@@ -41,6 +41,7 @@ public:
   virtual void ProcessClear();
   virtual FourCC GetVariableID() const override;
   virtual Variable &GetVariable();
+  virtual Variable *GetVariablePtr() override { return &GetVariable(); }
 
   // Storage-model-agnostic accessors used by Draw/ProcessArrow/ProcessClear
   // and overridable by packed-storage subclasses (UIParam*) that bypass

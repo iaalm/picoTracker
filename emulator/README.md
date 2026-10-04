@@ -163,7 +163,34 @@ node emulator/web/audiocheck.cjs # do non-silent samples reach the output?
 node emulator/web/touchcheck.cjs # do two/three contacts produce one mask?
 node emulator/web/padui.cjs      # does a pad press actually move the UI?
 node emulator/web/combocheck.cjs # does NAV+UP switch screens?
+node emulator/web/entercheck.cjs # ENTER+UP on a field owning no Variable
 ```
+
+`entercheck.cjs` needs a bundled project that has instruments; against the
+default empty one it passes without exercising anything.
+
+### Debugging a wasm trap
+
+A Release build reports only `Out of bounds call_indirect` with no hint of
+where. Configure with `-DPT_WEB_DEBUG=ON` for a build with assertions,
+SAFE_HEAP, stack checks and UBSan — it names the C++ frames:
+
+```sh
+emcmake cmake -S emulator -B build-web-dbg \
+      -DCMAKE_BUILD_TYPE=RelWithDebInfo -DPT_WEB_DEBUG=ON
+cmake --build build-web-dbg -j 4
+```
+
+The wasm goes from ~1.5 MB to ~13 MB and runs much slower, so this is for
+diagnosis only. Emscripten's default shell has no error UI; on a phone,
+inject an overlay that prints `window.onerror` to the page, since there is no
+console to read.
+
+Worth knowing: an indirect call that merely misbehaves on the device **traps**
+here. wasm checks the function-table index and the signature on every
+`call_indirect`, so a C-style downcast to the wrong field type is fatal rather
+than merely lucky. That is a feature — it surfaced a latent bug the hardware
+had been tolerating.
 
 `smoke.cjs` screenshots the canvas element rather than reading the WebGL
 buffer back: the context has `preserveDrawingBuffer: false`, so a readback

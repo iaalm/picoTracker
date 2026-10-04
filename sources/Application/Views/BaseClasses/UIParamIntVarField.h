@@ -41,6 +41,9 @@ public:
   virtual void ResetVar() override;
   virtual FourCC GetVariableID() const override;
   virtual Variable &GetVariable() override;
+  // No owned Variable: GetVariable() hands back a shared sentinel, so report
+  // "none" here rather than let a caller write into it.
+  virtual Variable *GetVariablePtr() override { return nullptr; }
 
 protected:
   I_Instrument *instr_;

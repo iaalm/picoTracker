@@ -1129,13 +1129,15 @@ void InstrumentView::ProcessButtonMask(unsigned short mask, bool pressed) {
       return;
     }
     if (getInstrument()->GetType() == IT_SAMPLE) {
-      UIIntVarField *field = (UIIntVarField *)GetFocus();
-      if (field->GetVariableID() == FourCC::SampleInstrumentEnd) {
-        Variable &var = field->GetVariable();
-        SampleInstrument *instrument = (SampleInstrument *)instr;
-        var.SetInt(instrument->GetSampleSize() - 1);
-        isDirty_ = true;
-        return;
+      UIField *focused = GetFocus();
+      if (focused && focused->GetVariableID() == FourCC::SampleInstrumentEnd) {
+        Variable *var = focused->GetVariablePtr();
+        if (var) {
+          SampleInstrument *instrument = (SampleInstrument *)instr;
+          var->SetInt(instrument->GetSampleSize() - 1);
+          isDirty_ = true;
+          return;
+        }
       };
     }
   }
@@ -1147,8 +1149,10 @@ void InstrumentView::ProcessButtonMask(unsigned short mask, bool pressed) {
   Player *player = Player::GetInstance();
 
   if (mask == EPBM_ENTER) {
-    // Get the current field to check if we're on the sample field
-    UIIntVarField *currentField = (UIIntVarField *)GetFocus();
+    // Get the current field to check if we're on the sample field.
+    // UIField*, not UIIntVarField*: only base-class virtuals are safe to
+    // call on an arbitrary focused field.
+    UIField *currentField = GetFocus();
 
     // Only allow sample import when the sample field is selected
     if (getInstrument()->GetType() == IT_SAMPLE && currentField &&
@@ -1191,19 +1195,24 @@ void InstrumentView::ProcessButtonMask(unsigned short mask, bool pressed) {
       viewMode_ = VM_NORMAL;
     }
 
-    UIIntVarField *field = (UIIntVarField *)GetFocus();
-    Variable &v = field->GetVariable();
-    switch (v.GetID()) {
-    case FourCC::SampleInstrumentTable: {
-      int next = TableHolder::GetInstance()->GetNext();
-      if (next != NO_MORE_TABLE) {
-        v.SetInt(next);
-        isDirty_ = true;
+    // Not every field owns a Variable -- the Name field is a UITextField.
+    // Casting it to UIIntVarField* and calling GetVariable() indexes past
+    // its vtable; ask the base class instead.
+    UIField *focused = GetFocus();
+    Variable *v = focused ? focused->GetVariablePtr() : nullptr;
+    if (v) {
+      switch (v->GetID()) {
+      case FourCC::SampleInstrumentTable: {
+        int next = TableHolder::GetInstance()->GetNext();
+        if (next != NO_MORE_TABLE) {
+          v->SetInt(next);
+          isDirty_ = true;
+        }
+        break;
       }
-      break;
-    }
-    default:
-      break;
+      default:
+        break;
+      }
     }
     mask &= (0xFFFF - EPBM_ENTER);
   } else {
@@ -1215,21 +1224,23 @@ void InstrumentView::ProcessButtonMask(unsigned short mask, bool pressed) {
 
   if (viewMode_ == VM_CLONE) {
     if ((mask & EPBM_ENTER) && (mask & EPBM_ALT)) {
-      UIIntVarField *field = (UIIntVarField *)GetFocus();
+      UIField *focused = GetFocus();
       mask &= (0xFFFF - EPBM_ENTER);
-      Variable &v = field->GetVariable();
-      int current = v.GetInt();
-      if (current == -1)
-        return;
+      Variable *v = focused ? focused->GetVariablePtr() : nullptr;
+      if (v) {
+        int current = v->GetInt();
+        if (current == -1)
+          return;
 
-      if ((field->GetVariableID() == FourCC::SampleInstrumentTable) ||
-          (field->GetVariableID() == FourCC::MidiInstrumentTable)) {
-        int next = TableHolder::GetInstance()->Clone(current);
-        if (next != NO_MORE_TABLE) {
-          v.SetInt(next);
-          isDirty_ = true;
-        }
-      };
+        if ((focused->GetVariableID() == FourCC::SampleInstrumentTable) ||
+            (focused->GetVariableID() == FourCC::MidiInstrumentTable)) {
+          int next = TableHolder::GetInstance()->Clone(current);
+          if (next != NO_MORE_TABLE) {
+            v->SetInt(next);
+            isDirty_ = true;
+          }
+        };
+      }
     }
     mask &= (0xFFFF - (EPBM_ENTER | EPBM_ALT));
   };
@@ -1302,7 +1313,7 @@ void InstrumentView::ProcessButtonMask(unsigned short mask, bool pressed) {
     }
   }
 
-  UIIntVarField *field = (UIIntVarField *)GetFocus();
+  UIField *field = GetFocus();
   if (field) {
     lastFocusID_ = field->GetVariableID();
   }
