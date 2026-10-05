@@ -164,10 +164,25 @@ node emulator/web/touchcheck.cjs # do two/three contacts produce one mask?
 node emulator/web/padui.cjs      # does a pad press actually move the UI?
 node emulator/web/combocheck.cjs # does NAV+UP switch screens?
 node emulator/web/entercheck.cjs # ENTER+UP on a field owning no Variable
+node emulator/web/settingscheck.cjs # walk every settings screen and field
 ```
 
-`entercheck.cjs` needs a bundled project that has instruments; against the
-default empty one it passes without exercising anything.
+`entercheck.cjs` and `settingscheck.cjs` need a bundled project that has
+instruments; against the default empty one they stop at the instrument
+screen rather than reporting a pass they did not earn.
+
+`settingscheck.cjs` drives the UI against the character grid the firmware
+rendered, via the `pt_get_screen_text` / `pt_get_cursor_row` hooks the web
+build exports. Every navigation step asserts where it landed, because a
+script that only presses buttons and checks for a crash will happily "pass"
+while stuck on the wrong screen — which happened repeatedly here before the
+hooks existed. Its route map (NAV+DOWN reaches the table from the instrument
+screen, the mixer keeps the "Song" title, device and project unwind with
+NAV+DOWN while the chain screens use NAV+LEFT) was read off each view's
+`ProcessButtonMask`, not guessed.
+
+Run it against a `PT_WEB_DEBUG` build to get the assertions and SAFE_HEAP
+checks: it has found crashes there that the Release build swallows silently.
 
 ### Debugging a wasm trap
 

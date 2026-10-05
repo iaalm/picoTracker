@@ -20,6 +20,7 @@ add_executable(picoTracker_tests
   foundation_types_tests.cpp
   wavheader_tests.cpp
   synth_voice_tests.cpp
+  format_spec_tests.cpp
   ../sources/Application/Instruments/WavHeader.cpp
   ../sources/Application/Instruments/SynthVoice.cpp
 )

@@ -18,6 +18,12 @@
 //
 // A wasm trap aborts the run, so an uncaught RuntimeError fails the suite
 // with the step that produced it.
+//
+// Needs a bundled project that has instruments: the chain/phrase/instrument
+// screens are unreachable from an empty song, so against the default
+// `.untitled` this stops early and says so rather than reporting a pass it
+// did not earn. Build with
+//   -DPT_WEB_SDROOT=<root whose .current names a project with samples>
 const puppeteer = require("puppeteer-core");
 
 const URL = process.env.PT_URL || "http://127.0.0.1:8731/";
@@ -199,7 +205,11 @@ const BITS = {
   });
   await step("nav to instrument screen", async () => {
     const ok = await gotoScreen("instrument", ["nav", "right"], 5);
-    if (!ok) throw new Error("never reached instrument screen");
+    if (!ok) {
+      throw new Error(
+        "never reached instrument screen -- the bundled project has no " +
+        "instruments? rebuild with -DPT_WEB_SDROOT pointing at one that does");
+    }
   });
   await sweepFields("instrument", 12);
 

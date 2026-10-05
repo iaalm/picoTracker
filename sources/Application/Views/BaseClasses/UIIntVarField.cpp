@@ -10,6 +10,7 @@
 #include "UIIntVarField.h"
 
 #include "Application/AppWindow.h"
+#include "Application/Utils/FormatSpec.h"
 #include "System/Console/Trace.h"
 #include "UIFramework/Interfaces/I_GUIGraphics.h"
 #include "UIIntVarField.h"
@@ -46,7 +47,7 @@ void UIIntVarField::Draw(GUIWindow &w, int offset) {
   // that rebinds a field can leave the two disagreeing, and handing an int to
   // a "%s" makes nanoprintf dereference it as a pointer. That is a segfault,
   // not a cosmetic glitch, so trust the format string over the type.
-  const bool wantsString = strstr(format_, "%s") != nullptr;
+  const bool wantsString = FormatWantsString(format_);
 
   switch (type) {
   case Variable::INT: {
