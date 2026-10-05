@@ -47,6 +47,11 @@ public:
   //! Flush current queue to the output
   void Flush();
 
+  // Tells this service which observable is the audio driver, so Update()
+  // can know that a notification from it really does carry an
+  // AudioDriver::Event. Call alongside AddObserver().
+  void SetAudioDriver(Observable *driver) { audioDriver_ = driver; }
+
   //! Handle MIDI transport messages
   void OnMidiStart();
   void OnMidiStop();
@@ -80,5 +85,13 @@ private:
   int currentOutQueue_;
 
   bool sendSync_;
+
+  // The config variables this service observes. Update() compares the
+  // incoming Observable against these to tell a variable change from an
+  // AudioDriver event: the two pass incompatible things as
+  // I_ObservableData * (a FourCC cast to a pointer vs a real Event *).
+  Observable *midiDeviceVar_ = nullptr;
+  Observable *midiSyncVar_ = nullptr;
+  Observable *audioDriver_ = nullptr;
 };
 #endif

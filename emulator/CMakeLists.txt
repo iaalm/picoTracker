@@ -125,8 +125,8 @@ if(EMSCRIPTEN)
     "-sEXIT_RUNTIME=0"
     "-sASYNCIFY=0"
     # The shell page's touch pad calls into the event manager directly.
-    "-sEXPORTED_FUNCTIONS=['_main','_pt_set_touch_mask']"
-    "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
+    "-sEXPORTED_FUNCTIONS=['_main','_pt_set_touch_mask','_pt_get_screen_text','_pt_get_cursor_row','_malloc','_free']"
+    "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','UTF8ToString','stringToUTF8']"
     "--preload-file" "${PT_WEB_SDROOT}@/sdcard"
     "--shell-file" "${CMAKE_CURRENT_LIST_DIR}/web/shell.html"
   )

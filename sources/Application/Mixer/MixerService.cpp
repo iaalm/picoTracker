@@ -56,6 +56,7 @@ bool MixerService::Init() {
     }
 
     out_->AddObserver(*MidiService::GetInstance());
+    MidiService::GetInstance()->SetAudioDriver(out_);
     bool pathConfigured = configureRenderPaths();
     if (!pathConfigured) {
       Trace::Error("[MixerService::Init] Failed to set audio render paths");
@@ -74,6 +75,7 @@ bool MixerService::Init() {
 void MixerService::Close() {
   if (out_) {
     out_->RemoveObserver(*MidiService::GetInstance());
+    MidiService::GetInstance()->SetAudioDriver(nullptr);
     out_->Close();
     out_->ClearModules();
     master_.ClearModules();

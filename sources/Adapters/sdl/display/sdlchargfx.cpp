@@ -7,6 +7,9 @@
  */
 
 #include "sdlchargfx.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 #include "Adapters/picoTracker/display/font.h"
 #include <SDL3/SDL.h>
 #include <string.h>
@@ -233,3 +236,50 @@ bool sdlchargfx_screenshot(const char *path) {
   SDL_DestroySurface(surface);
   return ok;
 }
+
+#ifdef __EMSCRIPTEN__
+// Test hooks: let a headless browser read back the character grid.
+//
+// The UI is a 32x24 grid of glyphs, so reading it is enough to know which
+// screen is up and which row the cursor is on -- without that, a test can
+// only press buttons and hope, and "it didn't crash" might just mean it
+// never reached the screen under test. Compiled only for the web build,
+// which is the only place these drive tests from.
+extern "C" {
+
+// Fills buf with TEXT_HEIGHT rows of TEXT_WIDTH chars, newline-separated,
+// NUL-terminated. Needs (TEXT_WIDTH + 1) * TEXT_HEIGHT + 1 bytes.
+EMSCRIPTEN_KEEPALIVE void pt_get_screen_text(char *buf, int cap) {
+  int n = 0;
+  for (int y = 0; y < TEXT_HEIGHT; y++) {
+    for (int x = 0; x < TEXT_WIDTH; x++) {
+      if (n + 2 >= cap) {
+        buf[n] = '\0';
+        return;
+      }
+      // screen_ stores glyph index == ascii - 32.
+      buf[n++] = (char)(screen_[y * TEXT_WIDTH + x] + 32);
+    }
+    if (n + 1 < cap) {
+      buf[n++] = '\n';
+    }
+  }
+  buf[n < cap ? n : cap - 1] = '\0';
+}
+
+// Row of the first inverted (highlighted) cell, which is where the focused
+// field is drawn, or -1 if nothing is highlighted. Inverted cells are
+// written with fg and bg swapped, so fg nibble == background colour 0.
+EMSCRIPTEN_KEEPALIVE int pt_get_cursor_row() {
+  for (int y = 0; y < TEXT_HEIGHT; y++) {
+    for (int x = 0; x < TEXT_WIDTH; x++) {
+      uint8_t c = colors_[y * TEXT_WIDTH + x];
+      if ((c >> 4) == 0 && (c & 0xf) != 0) {
+        return y;
+      }
+    }
+  }
+  return -1;
+}
+}
+#endif

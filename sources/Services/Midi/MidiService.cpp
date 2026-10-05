@@ -54,6 +54,7 @@ bool MidiService::Init() {
   auto midiDevVar =
       (WatchedVariable *)config->FindVariable(FourCC::VarMidiDevice);
   midiDevVar->AddObserver(*this);
+  midiDeviceVar_ = midiDevVar;
 
   auto activeDeviceConfig = midiDevVar->GetInt();
   updateActiveDevicesList(activeDeviceConfig);
@@ -61,6 +62,7 @@ bool MidiService::Init() {
   auto midiSyncVar =
       (WatchedVariable *)config->FindVariable(FourCC::VarMidiSync);
   midiSyncVar->AddObserver(*this);
+  midiSyncVar_ = midiSyncVar;
   auto sync = midiSyncVar->GetInt();
   sendSync_ = sync != 0;
 
@@ -104,27 +106,47 @@ void MidiService::AdvancePlayQueue() {
 }
 
 void MidiService::Update(Observable &o, I_ObservableData *d) {
-  AudioDriver::Event *event = (AudioDriver::Event *)d;
-  if (event->type_ == AudioDriver::Event::ADET_DRIVERTICK) {
-    onAudioTick();
-  }
-  WatchedVariable &v = (WatchedVariable &)o;
-  switch (v.GetID()) {
-    // need braces inside case statements due to:
-    // https://stackoverflow.com/a/11578973/85472
-  case FourCC::VarMidiDevice: {
-    auto activeDeviceConfig = v.GetInt();
-    // note deviceID has 0 == OFF
-    Trace::Debug("midi device var changed:%d", activeDeviceConfig);
+  // This observer is attached to three kinds of source, and they disagree
+  // about what `d` is:
+  //
+  //   AudioDriver       a real AudioDriver::Event *
+  //   WatchedVariable   a FourCC cast to a pointer -- not a pointer at all
+  //   MidiInDevice      a MidiMessage *, or nullptr
+  //
+  // Dereferencing d as an Event when it came from a WatchedVariable reads
+  // whatever address the FourCC happens to name. The device survives that;
+  // wasm reports it as a segfault. So dispatch on which observable sent it,
+  // and never guess from d itself.
+  if (&o == midiDeviceVar_ || &o == midiSyncVar_) {
+    WatchedVariable &v = (WatchedVariable &)o;
+    switch (v.GetID()) {
+      // need braces inside case statements due to:
+      // https://stackoverflow.com/a/11578973/85472
+    case FourCC::VarMidiDevice: {
+      auto activeDeviceConfig = v.GetInt();
+      // note deviceID has 0 == OFF
+      Trace::Debug("midi device var changed:%d", activeDeviceConfig);
 
-    stopDevice();
-    updateActiveDevicesList(activeDeviceConfig);
-    startDevice();
-  } break;
-  case FourCC::VarMidiSync: {
-    auto sync = v.GetInt();
-    sendSync_ = sync != 0;
-  } break;
+      stopDevice();
+      updateActiveDevicesList(activeDeviceConfig);
+      startDevice();
+    } break;
+    case FourCC::VarMidiSync: {
+      auto sync = v.GetInt();
+      sendSync_ = sync != 0;
+    } break;
+    }
+    return;
+  }
+
+  // Only the audio driver sends Events. A MidiInDevice notification lands
+  // here too, carrying a MidiMessage * (or nothing), which must not be read
+  // as one.
+  if (&o == audioDriver_ && d != nullptr) {
+    AudioDriver::Event *event = (AudioDriver::Event *)d;
+    if (event->type_ == AudioDriver::Event::ADET_DRIVERTICK) {
+      onAudioTick();
+    }
   }
 }
 

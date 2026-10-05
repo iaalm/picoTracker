@@ -39,12 +39,33 @@ void UIIntVarField::Draw(GUIWindow &w, int offset) {
 
   Variable::Type type = ReadType();
   char buffer[MAX_FIELD_WIDTH + 1];
+
+  // format_ and the variable's type are set independently -- the format comes
+  // from the fill*Parameters() call that built the field, the type from
+  // whatever Variable or packed parameter it ended up bound to. A refresh
+  // that rebinds a field can leave the two disagreeing, and handing an int to
+  // a "%s" makes nanoprintf dereference it as a pointer. That is a segfault,
+  // not a cosmetic glitch, so trust the format string over the type.
+  const bool wantsString = strstr(format_, "%s") != nullptr;
+
   switch (type) {
   case Variable::INT: {
+    if (wantsString) {
+      // Mismatch: render the number rather than crash, and make it visible
+      // that something is wrong rather than silently printing a plausible
+      // value.
+      int ivalue = ReadInt() + displayOffset_;
+      npf_snprintf(buffer, sizeof(buffer), "?%d", ivalue);
+      break;
+    }
     int ivalue = ReadInt() + displayOffset_;
     npf_snprintf(buffer, sizeof(buffer), format_, ivalue, ivalue);
   } break;
   case Variable::CHAR_LIST:
+    if (!wantsString) {
+      npf_snprintf(buffer, sizeof(buffer), format_, ReadInt(), ReadInt());
+      break;
+    }
     // if no value initialize with "NONE"
     if (ReadInt() < 0) {
       npf_snprintf(buffer, sizeof(buffer), format_, "NONE");
@@ -55,6 +76,10 @@ void UIIntVarField::Draw(GUIWindow &w, int offset) {
     }
     break;
   case Variable::BOOL: {
+    if (!wantsString) {
+      npf_snprintf(buffer, sizeof(buffer), format_, ReadInt(), ReadInt());
+      break;
+    }
     auto value = ReadString();
     const char *cvalue = value.c_str();
     npf_snprintf(buffer, sizeof(buffer), format_, cvalue);
