@@ -1,5 +1,6 @@
 add_library(application_views_baseclasses
   I_Action.cpp
+  HelpModal.cpp
   ModalView.cpp
   UIActionField.cpp
   UIBigHexVarField.cpp

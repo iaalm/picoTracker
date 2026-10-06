@@ -236,6 +236,12 @@ private:
   ModalView *modalView_;
   ModalViewCallback modalViewCallback_;
 
+  // Double-tap NAV (opens the keypad reference). navTapTime_ is when the
+  // last clean tap was released, navTapClean_ whether the press in progress
+  // has stayed free of other keys.
+  unsigned long navTapTime_;
+  bool navTapClean_;
+
 public:
   static int margin_;
   static int songRowCount_;

@@ -15,8 +15,10 @@
 #include "Application/Views/RecordView.h"
 #include "Application/Views/SampleEditorView.h"
 #include "Foundation/Constants/SpecialCharacters.h"
+#include "HelpModal.h"
 #include "ModalView.h"
 #include "System/Console/Trace.h"
+#include "System/System/System.h"
 #include <UIFramework/SimpleBaseClasses/EventManager.h>
 #include <nanoprintf.h>
 
@@ -56,6 +58,8 @@ View::View(GUIWindow &w, ViewData *viewData)
   locked_ = false;
   modalView_ = 0;
   modalViewCallback_ = ModalViewCallback();
+  navTapTime_ = 0;
+  navTapClean_ = false;
   // Initialize VU meter tracking variables
   for (int i = 0; i < SONG_CHANNEL_COUNT + 1; i++) {
     prevLeftVU_[i] = 0;
@@ -366,11 +370,50 @@ void View::Redraw() {
 
 void View::SetDirty(bool isDirty) { isDirty_ = isDirty; };
 
+// Double-tapping NAV on its own opens the keypad reference.
+//
+// This has to resolve on the release edge, not the press. NAV is a held
+// modifier: pressing it for NAV+UP raises EPBM_NAV first and the arrow
+// arrives as a second event, so anything that fired on the press would
+// trigger every time you switched views. Instead a tap only counts if the
+// mask never grew past EPBM_NAV for the whole press -- that makes a
+// modifier use self-cancelling.
+#define NAV_DOUBLE_TAP_MS 400
+
 void View::ProcessButton(unsigned short mask, bool pressed) {
   if (!pressed) {
     powerButtonPressed_ = false;
   } else if (mask & EPBM_POWER) {
     powerButtonPressed_ = pressed;
+  }
+
+  // Don't consume keys aimed at an open dialog -- including the help itself,
+  // which closes on any key.
+  if (!modalView_) {
+    if (mask & EPBM_NAV) {
+      // Still held: clean so far only if nothing else came down with it.
+      navTapClean_ = navTapClean_ && (mask == EPBM_NAV);
+    } else if (!pressed && navTapClean_) {
+      // NAV released after a press that stayed alone.
+      unsigned long now = System::GetInstance()->GetClock();
+      if (navTapTime_ != 0 && (now - navTapTime_) < NAV_DOUBLE_TAP_MS) {
+        navTapTime_ = 0;
+        navTapClean_ = false;
+        DoModal(HelpModal::Create(*this, viewType_));
+        return;
+      }
+      navTapTime_ = now;
+      navTapClean_ = false;
+    } else if (pressed) {
+      // Some other key went down; a NAV tap is no longer in progress and any
+      // pending first tap is stale.
+      navTapTime_ = 0;
+      navTapClean_ = false;
+    }
+    // A bare NAV press arms the next release.
+    if (pressed && mask == EPBM_NAV) {
+      navTapClean_ = true;
+    }
   }
 
   // Normal button processing
