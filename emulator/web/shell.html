@@ -86,28 +86,104 @@
       }
       #status { min-height: 18px; color: #7a7a86; font-size: 12px; }
 
+      /* Cheat sheet. Collapsed by default: the emulator should open on the
+         tracker, not on a wall of key combos. */
+      #cheat {
+        width: 100%;
+        max-width: 640px;
+        margin: 0 0 32px;
+        padding: 0 12px;
+        box-sizing: border-box;
+      }
+      #cheat summary {
+        cursor: pointer;
+        color: #8a8a96;
+        font-size: 12px;
+        padding: 6px 0;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      #cheat summary:hover { color: #c8c8d0; }
+      #cheat[open] summary { margin-bottom: 8px; }
+      /* Two columns where there is room, one on a phone. */
+      .sheet {
+        columns: 2;
+        column-gap: 24px;
+        font-size: 12px;
+      }
+      @media (max-width: 560px) { .sheet { columns: 1; } }
+      .sheet section {
+        break-inside: avoid;
+        margin: 0 0 14px;
+      }
+      .sheet h2 {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #6f6f7c;
+        margin: 0 0 5px;
+      }
+      .sheet dl { margin: 0; }
+      /* Each term/definition pair is wrapped in a div so the grid can lay
+         them out in two aligned columns. */
+      .sheet dl > div {
+        display: grid;
+        grid-template-columns: minmax(96px, auto) 1fr;
+        gap: 10px;
+        padding: 1.5px 0;
+      }
+      .sheet dt { color: #b4b4c0; white-space: nowrap; }
+      .sheet dd { margin: 0; color: #85858f; }
+      .sheet .note {
+        margin: 5px 0 0;
+        color: #6f6f7c;
+        font-size: 11px;
+        font-style: italic;
+      }
+      kbd {
+        font: inherit;
+        font-size: 11px;
+        color: #c8c8d0;
+        background: #1c1c22;
+        border: 1px solid #2e2e38;
+        border-radius: 3px;
+        padding: 0 4px;
+      }
+
       /* On-screen pad. Shown on coarse-pointer devices (phones, tablets);
          a mouse/keyboard user gets the keyboard instead. */
       #pad { display: none; }
       @media (pointer: coarse), (max-width: 700px) {
         #pad {
           display: flex;
-          justify-content: space-between;
+          justify-content: center;
           align-items: center;
-          gap: 16px;
           width: 100%;
           max-width: 640px;
           padding: 16px 12px 24px;
           box-sizing: border-box;
         }
       }
-      #dpad {
+      /* Mirrors the device's physical keypad, which is a single 4-column
+         block rather than a gamepad's split dpad/action halves -- see
+         InputTester.cpp's drawInputTester() and docs/img/keynames.jpg:
+
+               UP    PLAY  EDIT
+         LEFT  DOWN  RIGHT ENTER
+               ALT   NAV
+
+         ALT and NAV sit under the arrows on purpose: on the device they
+         modify the keys on the opposite side, so the combos the manual
+         lists (ALT+arrow, NAV+ENTER) stay comfortable two-thumb reaches. */
+      #keypad {
         display: grid;
-        grid-template-areas: ". u ." "l . r" ". d .";
+        grid-template-areas:
+          ".    up   play  edit"
+          "left down right enter"
+          ".    alt  nav   .";
         gap: 6px;
       }
-      #actions { display: flex; flex-direction: column; gap: 6px; }
-      #actions .row { display: flex; gap: 6px; }
       .key {
         /* 56px keeps every target above the ~44px minimum touch size. */
         min-width: 56px;
@@ -125,7 +201,6 @@
         -webkit-user-select: none;
         -webkit-tap-highlight-color: transparent;
       }
-      .key.wide { min-width: 118px; }
       .key.mod { background: #1b2430; }
       .key.on {
         background: #3b6ea5;
@@ -147,24 +222,16 @@
     </div>
 
     <div id="pad" aria-hidden="true">
-      <div id="dpad">
-        <button class="key" data-key="up"    style="grid-area:u">&uarr;</button>
-        <button class="key" data-key="left"  style="grid-area:l">&larr;</button>
-        <button class="key" data-key="right" style="grid-area:r">&rarr;</button>
-        <button class="key" data-key="down"  style="grid-area:d">&darr;</button>
-      </div>
-      <div id="actions">
-        <div class="row">
-          <button class="key mod" data-key="nav">NAV</button>
-          <button class="key mod" data-key="alt">ALT</button>
-        </div>
-        <div class="row">
-          <button class="key" data-key="enter">ENTER</button>
-          <button class="key" data-key="edit">EDIT</button>
-        </div>
-        <div class="row">
-          <button class="key wide" data-key="play">PLAY</button>
-        </div>
+      <div id="keypad">
+        <button class="key" data-key="up"    style="grid-area:up">&uarr;</button>
+        <button class="key" data-key="play"  style="grid-area:play">PLAY</button>
+        <button class="key" data-key="edit"  style="grid-area:edit">EDIT</button>
+        <button class="key" data-key="left"  style="grid-area:left">&larr;</button>
+        <button class="key" data-key="down"  style="grid-area:down">&darr;</button>
+        <button class="key" data-key="right" style="grid-area:right">&rarr;</button>
+        <button class="key" data-key="enter" style="grid-area:enter">ENTER</button>
+        <button class="key mod" data-key="alt" style="grid-area:alt">ALT</button>
+        <button class="key mod" data-key="nav" style="grid-area:nav">NAV</button>
       </div>
     </div>
 
@@ -179,6 +246,64 @@
       Changes you make are kept in the tab only &mdash; reloading the page
       restores the bundled SD card.
     </div>
+
+    <!-- Condensed from usermanual/pico-edition/content/pages/keypadcombos.md,
+         which is ~400 lines covering every view. These are the combos that
+         are the same everywhere, plus the few per-view ones you cannot get
+         anywhere without. -->
+    <details id="cheat">
+      <summary>Cheat sheet</summary>
+      <div class="sheet">
+        <section>
+          <h2>Edit values</h2>
+          <dl>
+            <div><dt><kbd>ENTER</kbd></dt><dd>insert last used value</dd></div>
+            <div><dt><kbd>ENTER</kbd>,<kbd>ENTER</kbd></dt><dd>insert next unused chain/phrase</dd></div>
+            <div><dt><kbd>ENTER</kbd>+<kbd>&larr;</kbd>/<kbd>&rarr;</kbd></dt><dd>value &minus;/&plus; 1</dd></div>
+            <div><dt><kbd>ENTER</kbd>+<kbd>&darr;</kbd>/<kbd>&uarr;</kbd></dt><dd>value &minus;/&plus; 16</dd></div>
+            <div><dt><kbd>ALT</kbd>+<kbd>ENTER</kbd></dt><dd>cut if filled, paste if empty</dd></div>
+            <div><dt><kbd>ALT</kbd>+<kbd>EDIT</kbd>,<kbd>ENTER</kbd></dt><dd>clone into next free slot</dd></div>
+          </dl>
+        </section>
+
+        <section>
+          <h2>Select</h2>
+          <dl>
+            <div><dt><kbd>ALT</kbd>+<kbd>EDIT</kbd></dt><dd>start selection, then arrows</dd></div>
+            <div><dt>&hellip;again / 3&times;</dt><dd>grow to row / whole screen</dd></div>
+            <div><dt><kbd>EDIT</kbd></dt><dd>copy selection</dd></div>
+            <div><dt><kbd>ALT</kbd>+<kbd>ENTER</kbd></dt><dd>cut selection</dd></div>
+          </dl>
+        </section>
+
+        <section>
+          <h2>Play</h2>
+          <dl>
+            <div><dt><kbd>PLAY</kbd></dt><dd>start / stop</dd></div>
+            <div><dt><kbd>NAV</kbd>+<kbd>PLAY</kbd></dt><dd>stop chain when it ends</dd></div>
+            <div><dt><kbd>ALT</kbd>+<kbd>PLAY</kbd></dt><dd>play from current row</dd></div>
+            <div><dt><kbd>NAV</kbd>+<kbd>EDIT</kbd></dt><dd>mute track</dd></div>
+            <div><dt><kbd>NAV</kbd>+<kbd>ENTER</kbd></dt><dd>solo track</dd></div>
+            <div><dt><kbd>NAV</kbd>+<kbd>ALT</kbd></dt><dd>unmute everything</dd></div>
+          </dl>
+          <p class="note">
+            Mute/solo: release <kbd>NAV</kbd> first to keep it latched.
+          </p>
+        </section>
+
+        <section>
+          <h2>In Song view</h2>
+          <dl>
+            <div><dt><kbd>EDIT</kbd>+<kbd>&uarr;</kbd>/<kbd>&darr;</kbd></dt><dd>page up / down</dd></div>
+            <div><dt><kbd>EDIT</kbd>+<kbd>&larr;</kbd>/<kbd>&rarr;</kbd></dt><dd>Song &harr; Live mode</dd></div>
+          </dl>
+          <p class="note">
+            In Chain/Phrase/Instrument views <kbd>EDIT</kbd>+arrows warp to the
+            previous/next one instead.
+          </p>
+        </section>
+      </div>
+    </details>
 
     <script type="text/javascript">
       var canvas = document.getElementById("canvas");
@@ -197,6 +322,14 @@
         },
         { capture: true }
       );
+
+      // Opening the cheat sheet focuses its <summary>, and Space on a focused
+      // summary toggles it -- so the next PLAY press would close the sheet
+      // instead of starting the sequencer. Hand focus straight back.
+      var cheat = document.getElementById("cheat");
+      cheat.addEventListener("toggle", function () {
+        canvas.focus();
+      });
 
       overlay.addEventListener("click", function () {
         overlay.classList.add("hidden");
