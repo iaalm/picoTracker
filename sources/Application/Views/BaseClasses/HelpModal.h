@@ -38,13 +38,17 @@ protected:
   HelpModal(View &view, ViewType forView);
 
 private:
-  // Total lines across the common and per-view blocks.
+  // Total lines across the common, track and per-view blocks.
   int LineCount() const;
-  // Resolves a flat index onto one of the two blocks.
+  // Lines contributed by the track block (zero where it does not apply).
+  int TrackLineCount() const;
+  // Resolves a flat index onto one of the blocks.
   const char *LineAt(int index) const;
 
   const char *const *viewLines_;
   int viewLineCount_;
+  // Whether this screen acts on a track, and so shows mute/solo.
+  bool hasTrackLines_;
   int topLine_;
 
   static bool inUse_;

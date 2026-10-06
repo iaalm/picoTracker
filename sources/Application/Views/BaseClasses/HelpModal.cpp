@@ -29,16 +29,20 @@ static const char *const commonLines[] = {
     "NAV+L/R    back / deeper view",
     "NAV+UP     project",
     "NAV+DOWN   mixer",
-    "NAV+EDIT   mute track",
-    "NAV+ENTER  solo track",
-    "NAV+ALT    unmute all",
     "ENTER      insert value",
     "ENTER,ENTER  next unused",
-    "ENTER+L/R  value -/+ 1",
-    "ENTER+U/D  value -/+ 16",
     "ALT+ENTER  cut / paste",
     "ALT+EDIT   start select",
     "EDIT       copy selection",
+};
+
+// Mute and solo act on the track under the cursor, so they only exist on the
+// screens that have one: song, chain, phrase and mixer. Instrument and table
+// do not handle them at all.
+static const char *const trackLines[] = {
+    "NAV+EDIT   mute track",
+    "NAV+ENTER  solo track",
+    "NAV+ALT    unmute all",
 };
 
 static const char *const songLines[] = {
@@ -95,19 +99,27 @@ HelpModal *HelpModal::Create(View &view, ViewType forView) {
 }
 
 HelpModal::HelpModal(View &view, ViewType forView)
-    : ModalView(view), viewLines_(nullptr), viewLineCount_(0), topLine_(0) {
+    : ModalView(view), viewLines_(nullptr), viewLineCount_(0),
+      hasTrackLines_(false), topLine_(0) {
   switch (forView) {
   case VT_SONG:
     viewLines_ = songLines;
     viewLineCount_ = COUNT_OF(songLines);
+    hasTrackLines_ = true;
     break;
   case VT_CHAIN:
     viewLines_ = chainLines;
     viewLineCount_ = COUNT_OF(chainLines);
+    hasTrackLines_ = true;
     break;
   case VT_PHRASE:
     viewLines_ = phraseLines;
     viewLineCount_ = COUNT_OF(phraseLines);
+    hasTrackLines_ = true;
+    break;
+  case VT_MIXER:
+    // No block of its own, but it does mute and solo.
+    hasTrackLines_ = true;
     break;
   case VT_INSTRUMENT:
     viewLines_ = instrumentLines;
@@ -131,8 +143,12 @@ void HelpModal::Destroy() {
   inUse_ = false;
 }
 
+int HelpModal::TrackLineCount() const {
+  return hasTrackLines_ ? COUNT_OF(trackLines) : 0;
+}
+
 int HelpModal::LineCount() const {
-  return viewLineCount_ + COUNT_OF(commonLines);
+  return viewLineCount_ + COUNT_OF(commonLines) + TrackLineCount();
 }
 
 const char *HelpModal::LineAt(int index) const {
@@ -141,7 +157,13 @@ const char *HelpModal::LineAt(int index) const {
   if (index < viewLineCount_) {
     return viewLines_[index];
   }
-  return commonLines[index - viewLineCount_];
+  index -= viewLineCount_;
+  // Then the common block, with the track bindings appended to it on the
+  // screens that have them -- they belong under the same heading.
+  if (index < COUNT_OF(commonLines)) {
+    return commonLines[index];
+  }
+  return trackLines[index - COUNT_OF(commonLines)];
 }
 
 void HelpModal::DrawView() {
