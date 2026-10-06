@@ -33,8 +33,24 @@ static const char *const commonLines[] = {
     "ENTER,ENTER  next unused",
     "ALT+ENTER  cut / paste",
     "ALT+EDIT   start select",
-    "EDIT       copy selection",
 };
+
+// Once a selection is open the keys mean something else -- processed by a
+// separate handler (e.g. SongView::processSelectionButtonMask), where bare
+// EDIT copies instead of doing nothing and the arrows resize the block
+// rather than move the cursor. Listing them beside the normal bindings read
+// as if they were always live.
+// One binding per line, as in the blocks above; clang-format would otherwise
+// pack this one two-per-line because the strings are shorter.
+// clang-format off
+static const char *const selectionLines[] = {
+    HEAD "WHILE SELECTING",
+    "ARROWS     resize block",
+    "ALT+EDIT   grow row/screen",
+    "EDIT       copy selection",
+    "ALT+ENTER  cut selection",
+};
+// clang-format on
 
 // Mute and solo act on the track under the cursor, so they only exist on the
 // screens that have one: song, chain, phrase and mixer. Instrument and table
@@ -148,7 +164,8 @@ int HelpModal::TrackLineCount() const {
 }
 
 int HelpModal::LineCount() const {
-  return viewLineCount_ + COUNT_OF(commonLines) + TrackLineCount();
+  return viewLineCount_ + COUNT_OF(commonLines) + TrackLineCount() +
+         COUNT_OF(selectionLines);
 }
 
 const char *HelpModal::LineAt(int index) const {
@@ -163,7 +180,13 @@ const char *HelpModal::LineAt(int index) const {
   if (index < COUNT_OF(commonLines)) {
     return commonLines[index];
   }
-  return trackLines[index - COUNT_OF(commonLines)];
+  index -= COUNT_OF(commonLines);
+  if (index < TrackLineCount()) {
+    return trackLines[index];
+  }
+  // The selection bindings go last, under their own heading: they only
+  // apply once a selection is open.
+  return selectionLines[index - TrackLineCount()];
 }
 
 void HelpModal::DrawView() {
