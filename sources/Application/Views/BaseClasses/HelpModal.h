@@ -15,7 +15,9 @@
 //
 // The text is a common block (combos that behave the same everywhere)
 // followed by a block specific to the screen the help was opened from, so
-// what you see matches what the keys under your thumbs actually do.
+// what you see matches what the keys under your thumbs actually do. On the
+// song screen the block also depends on the sequencer mode, which changes
+// what PLAY does.
 //
 // Lives in BaseClasses rather than ModalDialogs because View::ProcessButton
 // opens it, and View.cpp is built into application_views_baseclasses --
@@ -38,17 +40,13 @@ protected:
   HelpModal(View &view, ViewType forView);
 
 private:
-  // Total lines across the common, track and per-view blocks.
+  // Total lines across the common and per-view blocks.
   int LineCount() const;
-  // Lines contributed by the track block (zero where it does not apply).
-  int TrackLineCount() const;
   // Resolves a flat index onto one of the blocks.
   const char *LineAt(int index) const;
 
   const char *const *viewLines_;
   int viewLineCount_;
-  // Whether this screen acts on a track, and so shows mute/solo.
-  bool hasTrackLines_;
   int topLine_;
 
   static bool inUse_;

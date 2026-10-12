@@ -8,6 +8,7 @@
 
 #include "HelpModal.h"
 #include "Application/AppWindow.h"
+#include "Application/Player/Player.h"
 #include <new>
 
 // ModalView::SetWindow clamps to 28x20, so that -- not SCREEN_WIDTH -- is
@@ -25,56 +26,67 @@
 
 static const char *const commonLines[] = {
     HEAD "ANY SCREEN",
-    "PLAY       start / stop",
-    "NAV+L/R    back / deeper view",
-    "NAV+UP     project",
-    "NAV+DOWN   mixer",
     "ENTER      insert value",
     "ENTER,ENTER  next unused",
+    "EDIT+ENTER cut value",
     "ALT+ENTER  cut / paste",
     "ALT+EDIT   start select",
 };
 
 // Once a selection is open the keys mean something else -- processed by a
 // separate handler (e.g. SongView::processSelectionButtonMask), where bare
-// EDIT copies instead of doing nothing and the arrows resize the block
-// rather than move the cursor. Listing them beside the normal bindings read
-// as if they were always live.
+// EDIT copies instead of doing nothing. Listing them beside the normal
+// bindings read as if they were always live.
 // One binding per line, as in the blocks above; clang-format would otherwise
 // pack this one two-per-line because the strings are shorter.
 // clang-format off
 static const char *const selectionLines[] = {
     HEAD "WHILE SELECTING",
-    "ARROWS     resize block",
     "ALT+EDIT   grow row/screen",
     "EDIT       copy selection",
     "ALT+ENTER  cut selection",
 };
 // clang-format on
 
-// Mute and solo act on the track under the cursor, so they only exist on the
-// screens that have one: song, chain, phrase and mixer. Instrument and table
-// do not handle them at all.
-static const char *const trackLines[] = {
+// The song screen is two screens wearing one coat: EDIT+L/R flips the
+// sequencer between song and live mode, and PLAY, EDIT+PLAY and NAV+PLAY
+// then do entirely different things (see Player::OnSongStartButton). Showing
+// both sets at once would mean half the block is wrong whichever mode you
+// are in, so the help picks the block for the mode you are actually in.
+static const char *const songModeLines[] = {
+    HEAD "SONG - SONG MODE",
+    "PLAY       start / stop",
+    "EDIT+PLAY  record screen",
+    "ALT+PLAY   live from row",
+    "ALT+L/R    nudge tempo",
+    "ALT+U/D    next filled row",
+    "EDIT+U/D   page up / down",
+    "EDIT+L/R   go live mode",
     "NAV+EDIT   mute track",
     "NAV+ENTER  solo track",
     "NAV+ALT    unmute all",
 };
 
-static const char *const songLines[] = {
-    HEAD "SONG",
+static const char *const liveModeLines[] = {
+    HEAD "SONG - LIVE MODE",
+    "PLAY       queue chain",
+    "EDIT+PLAY  start now",
+    "NAV+PLAY   stop at end",
+    "ALT+PLAY   all from row",
     "ALT+L/R    nudge tempo",
     "ALT+U/D    next filled row",
-    "ALT+PLAY   play from row",
-    "NAV+PLAY   stop at end",
     "EDIT+U/D   page up / down",
-    "EDIT+L/R   song / live mode",
+    "EDIT+L/R   go song mode",
+    "NAV+EDIT   mute track",
+    "NAV+ENTER  solo track",
+    "NAV+ALT    unmute all",
 };
 
 static const char *const chainLines[] = {
     HEAD "CHAIN",
     "EDIT+L/R   prev/next chan",
     "EDIT+U/D   prev/next chain",
+    "EDIT+ALT,ALT+ENTER clone",
     "NAV+PLAY   play in song",
 };
 
@@ -83,6 +95,7 @@ static const char *const phraseLines[] = {
     "ENTER hold audition note",
     "EDIT+L/R   prev/next track",
     "EDIT+U/D   prev/next phrase",
+    "EDIT+ALT,ALT+ENTER clone",
     "NAV+PLAY   play in song",
 };
 
@@ -90,6 +103,8 @@ static const char *const instrumentLines[] = {
     HEAD "INSTRUMENT",
     "EDIT+L/R   instr -/+ 1",
     "EDIT+U/D   instr -/+ 16",
+    "ENTER+EDIT reset to default",
+    "EDIT+ALT,ALT+ENTER clone",
 };
 
 static const char *const tableLines[] = {
@@ -115,27 +130,23 @@ HelpModal *HelpModal::Create(View &view, ViewType forView) {
 }
 
 HelpModal::HelpModal(View &view, ViewType forView)
-    : ModalView(view), viewLines_(nullptr), viewLineCount_(0),
-      hasTrackLines_(false), topLine_(0) {
+    : ModalView(view), viewLines_(nullptr), viewLineCount_(0), topLine_(0) {
   switch (forView) {
-  case VT_SONG:
-    viewLines_ = songLines;
-    viewLineCount_ = COUNT_OF(songLines);
-    hasTrackLines_ = true;
+  case VT_SONG: {
+    // Read the mode once, when the help opens -- it cannot change while a
+    // modal has the keys.
+    bool live = Player::GetInstance()->GetSequencerMode() == SM_LIVE;
+    viewLines_ = live ? liveModeLines : songModeLines;
+    viewLineCount_ = live ? COUNT_OF(liveModeLines) : COUNT_OF(songModeLines);
     break;
+  }
   case VT_CHAIN:
     viewLines_ = chainLines;
     viewLineCount_ = COUNT_OF(chainLines);
-    hasTrackLines_ = true;
     break;
   case VT_PHRASE:
     viewLines_ = phraseLines;
     viewLineCount_ = COUNT_OF(phraseLines);
-    hasTrackLines_ = true;
-    break;
-  case VT_MIXER:
-    // No block of its own, but it does mute and solo.
-    hasTrackLines_ = true;
     break;
   case VT_INSTRUMENT:
     viewLines_ = instrumentLines;
@@ -159,13 +170,8 @@ void HelpModal::Destroy() {
   inUse_ = false;
 }
 
-int HelpModal::TrackLineCount() const {
-  return hasTrackLines_ ? COUNT_OF(trackLines) : 0;
-}
-
 int HelpModal::LineCount() const {
-  return viewLineCount_ + COUNT_OF(commonLines) + TrackLineCount() +
-         COUNT_OF(selectionLines);
+  return viewLineCount_ + COUNT_OF(commonLines) + COUNT_OF(selectionLines);
 }
 
 const char *HelpModal::LineAt(int index) const {
@@ -175,18 +181,12 @@ const char *HelpModal::LineAt(int index) const {
     return viewLines_[index];
   }
   index -= viewLineCount_;
-  // Then the common block, with the track bindings appended to it on the
-  // screens that have them -- they belong under the same heading.
   if (index < COUNT_OF(commonLines)) {
     return commonLines[index];
   }
-  index -= COUNT_OF(commonLines);
-  if (index < TrackLineCount()) {
-    return trackLines[index];
-  }
   // The selection bindings go last, under their own heading: they only
   // apply once a selection is open.
-  return selectionLines[index - TrackLineCount()];
+  return selectionLines[index - COUNT_OF(commonLines)];
 }
 
 void HelpModal::DrawView() {
