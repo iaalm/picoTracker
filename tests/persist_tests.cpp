@@ -3,13 +3,18 @@
 #include "Application/Instruments/OpalInstrument.h"
 #include "Application/Instruments/SIDInstrument.h"
 #include "Application/Instruments/SampleInstrument.h"
+#include "Application/Instruments/SamplePool.h"
 #include "Application/Instruments/SynthInstrument.h"
 #include "Application/Persistency/PersistencyDocument.h"
 #include "Application/Persistency/PersistencyService.h"
+#include "Externals/TinyXML2/tinyxml2.h"
+#include "System/FileSystem/I_File.h"
 #include "doctest/doctest.h"
 #include "Foundation/Types/Types.h"
 #include "helpers/load_buffer.h"
+#include <algorithm>
 #include <cstring>
+#include <string>
 
 TEST_CASE("R4: PersistencyDocument rejects corrupted bytes") {
   PersistencyDocument doc;
@@ -772,4 +777,212 @@ TEST_CASE("R8: string-typed params resolve to a printable label") {
     MidiInstrument in;
     checkParamLabels("MidiInstrument", in);
   }
+}
+
+// ---------------------------------------------------------------------------
+// R9: instrument name survives a save/restore round-trip.
+//
+// Why this test exists: I_Instrument::SaveContent writes the instrument name
+// once from name_ (PARAM NAME="InstrumentName"), then walked the index-based
+// parameter API from idx 0. Index 0 IS the reserved name slot, so the loop
+// emitted a *second* PARAM NAME="InstrumentName" — formatted with "%d" over
+// params_[0], a slot no instrument ever writes, hence always "0".
+// RestoreContent processes PARAMs in document order and the old code called
+// SetName() unconditionally, so the "0" clobbered the real name. Every
+// instrument on every synth reloaded as "0".
+//
+// The save side now starts the loop at idx 1; the restore side keeps the
+// first InstrumentName and ignores later ones, so projects written by the
+// buggy firmware still reload with their real names.
+//
+// We drive the file-backed XMLPrinter (the path SaveProjectData uses), not
+// SaveToBuffer, so the test covers what the device actually runs.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// In-memory I_File — XMLPrinter(fp) writes here, PersistencyDocument reads
+// the same bytes back.
+class MemFile : public I_File {
+public:
+  std::string buf;
+  size_t pos = 0;
+  int Read(void *ptr, int size) override {
+    size_t n = std::min(static_cast<size_t>(size), buf.size() - pos);
+    memcpy(ptr, buf.data() + pos, n);
+    pos += n;
+    return static_cast<int>(n);
+  }
+  int GetC() override {
+    return pos < buf.size() ? static_cast<unsigned char>(buf[pos++]) : -1;
+  }
+  int Write(const void *ptr, int size, int nmemb) override {
+    buf.append(static_cast<const char *>(ptr),
+               static_cast<size_t>(size) * nmemb);
+    return nmemb;
+  }
+  void Seek(long offset, int) override { pos = static_cast<size_t>(offset); }
+  long Tell() override { return static_cast<long>(pos); }
+  int Error() override { return 0; }
+  bool Sync() override { return true; }
+  void Dispose() override {}
+
+protected:
+  bool Close() override { return true; }
+};
+
+// Save `src`, reload into `dst`, and compare the name plus every parameter.
+template <typename T> void checkRoundTrip(const char *label, T &src, T &dst) {
+  INFO(label << " save/restore round-trip");
+
+  MemFile f;
+  {
+    tinyxml2::XMLPrinter printer(&f);
+    printer.OpenElement("INSTRUMENT");
+    src.SaveContent(&printer);
+    printer.CloseElement();
+  }
+
+  // Exactly one InstrumentName PARAM must be written. The bug emitted two.
+  size_t nameCount = 0, at = 0;
+  const std::string needle = "NAME=\"InstrumentName\"";
+  while ((at = f.buf.find(needle, at)) != std::string::npos) {
+    ++nameCount;
+    at += needle.size();
+  }
+  CHECK(nameCount == 1);
+
+  PersistencyDocument doc;
+  REQUIRE(doc.LoadFromBuffer(reinterpret_cast<const uint8_t *>(f.buf.data()),
+                             f.buf.size()) == true);
+  REQUIRE(doc.FirstChild() == true); // INSTRUMENT
+  dst.RestoreContent(&doc);
+
+  CHECK(strcmp(src.GetUserSetName().c_str(), dst.GetUserSetName().c_str()) ==
+        0);
+  for (int i = 1; i < src.GetParamCount(); ++i) {
+    INFO(label << " param idx=" << i << " '" << src.GetParamName(i) << "'");
+    CHECK(src.GetParamValue(i) == dst.GetParamValue(i));
+  }
+}
+
+// Nudge every parameter off its default so a silent reset would show up as a
+// mismatch rather than coincidentally matching.
+void perturb(I_Instrument &in) {
+  for (int i = 1; i < in.GetParamCount(); ++i) {
+    int v = in.GetParamValue(i);
+    in.SetParamValue(i, v < in.GetParamMax(i) ? v + 1 : in.GetParamMin(i));
+  }
+}
+
+// Minimal host SamplePool. SampleInstrument's constructor builds a
+// SampleVariable, which dereferences SamplePool::GetInstance() — null unless
+// a pool is installed, which is why SampleInstrument used to be the one
+// migrated instrument no host test could construct. The real pool's
+// constructor only zeroes its name table (no filesystem), so subclassing it
+// to supply the pure virtuals is enough.
+class HostSamplePool : public SamplePool {
+public:
+  void Reset() override {}
+  bool CheckSampleFits(int) override { return false; }
+  uint32_t GetAvailableSampleStorageSpace() override { return 0; }
+  bool unloadSample(uint32_t) override { return false; }
+
+protected:
+  bool loadSample(const char *) override { return false; }
+};
+
+// Installed once, on first use — T_Factory keeps a raw pointer, so the pool
+// has to outlive every instrument built from it.
+void installSamplePool() {
+  if (!SamplePool::GetInstance()) {
+    static HostSamplePool pool;
+    SamplePool::Install(&pool);
+  }
+}
+
+} // namespace
+
+TEST_CASE("R9: instrument name and params survive save/restore") {
+  SUBCASE("SynthInstrument (KX1)") {
+    SynthInstrument src, dst;
+    src.SetName("KICK1");
+    perturb(src);
+    checkRoundTrip("SynthInstrument", src, dst);
+  }
+  SUBCASE("SIDInstrument") {
+    SIDInstrument src(SID1), dst(SID1);
+    src.SetName("LEAD9");
+    perturb(src);
+    checkRoundTrip("SIDInstrument", src, dst);
+  }
+  SUBCASE("MidiInstrument") {
+    MidiInstrument src, dst;
+    src.SetName("PAD7");
+    perturb(src);
+    checkRoundTrip("MidiInstrument", src, dst);
+  }
+  SUBCASE("SampleInstrument") {
+    // Worth covering separately: SampleInstrument overrides both SaveContent
+    // and RestoreContent (for the legacy `sample` field and the SLnn slice
+    // points), so it does NOT inherit the base-class restore loop the other
+    // instruments share. Its name handling is a second, independent copy.
+    installSamplePool();
+    SampleInstrument src, dst;
+    src.SetName("SNARE");
+    perturb(src);
+    checkRoundTrip("SampleInstrument", src, dst);
+  }
+  // OpalInstrument is deliberately not instantiated here — same reason as R8:
+  // its constructor reaches Opal::Channel/Operator, which this target leaves
+  // unresolved. It shares I_Instrument::SaveContent, so the fix covers it.
+}
+
+// Projects written by the buggy firmware carry the stray second
+// InstrumentName="0". Restoring one must keep the real name.
+//
+// The literal below mirrors what XMLPrinter(fp) actually writes — indented,
+// one element per line. Compact (newline-free) XML is NOT equivalent here:
+// after RestoreContent walks the INSTRUMENT attributes, yxml needs the
+// whitespace before the first child for FirstChild() to land on it. See the
+// YXML_CONTENT branch in PersistencyDocument::NextAttribute.
+TEST_CASE("R9b: legacy duplicate InstrumentName PARAM does not clobber name") {
+  const char *xml = "<INSTRUMENT VERSION=\"2.3-Beta3\" TYPE=\"KX1\">\n"
+                    "    <PARAM NAME=\"InstrumentName\" VALUE=\"KICK1\"/>\n"
+                    "    <PARAM NAME=\"InstrumentName\" VALUE=\"0\"/>\n"
+                    "    <PARAM NAME=\"SYNVOLUME\" VALUE=\"200\"/>\n"
+                    "</INSTRUMENT>\n";
+  PersistencyDocument doc;
+  REQUIRE(doc.LoadFromBuffer(reinterpret_cast<const uint8_t *>(xml),
+                             strlen(xml)) == true);
+  REQUIRE(doc.FirstChild() == true);
+
+  SynthInstrument in;
+  in.RestoreContent(&doc);
+  CHECK(strcmp(in.GetUserSetName().c_str(), "KICK1") == 0);
+  CHECK(in.GetParamValue(SynthInstrument::PARAM_VOLUME) == 200);
+}
+
+// SampleInstrument has its own RestoreContent, so the duplicate-name guard in
+// I_Instrument does not cover it — this exercises the second copy. The SLnn
+// slice point is included because it shares the same attribute loop and would
+// be the natural casualty of a mis-ordered branch there.
+TEST_CASE("R9c: SampleInstrument ignores a duplicate InstrumentName PARAM") {
+  installSamplePool();
+  const char *xml = "<INSTRUMENT VERSION=\"2.3-Beta3\" TYPE=\"SAMPLE\">\n"
+                    "    <PARAM NAME=\"InstrumentName\" VALUE=\"SNARE\"/>\n"
+                    "    <PARAM NAME=\"InstrumentName\" VALUE=\"0\"/>\n"
+                    "    <PARAM NAME=\"volume\" VALUE=\"200\"/>\n"
+                    "    <PARAM NAME=\"SL01\" VALUE=\"4096\"/>\n"
+                    "</INSTRUMENT>\n";
+  PersistencyDocument doc;
+  REQUIRE(doc.LoadFromBuffer(reinterpret_cast<const uint8_t *>(xml),
+                             strlen(xml)) == true);
+  REQUIRE(doc.FirstChild() == true);
+
+  SampleInstrument in;
+  in.RestoreContent(&doc);
+  CHECK(strcmp(in.GetUserSetName().c_str(), "SNARE") == 0);
+  CHECK(in.GetParamValue(SampleInstrument::PARAM_VOLUME) == 200);
+  CHECK(in.GetSlicePoint(1) == 4096);
 }

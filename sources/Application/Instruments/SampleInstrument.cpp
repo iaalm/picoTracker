@@ -1577,6 +1577,7 @@ void SampleInstrument::RestoreContent(PersistencyDocument *doc) {
   }
 
   bool subelem = doc->FirstChild();
+  bool gotName = false;
 
   while (subelem) {
     bool attr = doc->NextAttribute();
@@ -1595,7 +1596,12 @@ void SampleInstrument::RestoreContent(PersistencyDocument *doc) {
 
     if (!name.empty() && !value.empty()) {
       if (!strcasecmp(name.c_str(), "InstrumentName")) {
-        SetName(value.c_str());
+        // First one wins — see I_Instrument::RestoreContent. Projects saved
+        // before the duplicate-name fix carry a bogus second entry ("0").
+        if (!gotName) {
+          SetName(value.c_str());
+          gotName = true;
+        }
       } else if (!strncasecmp(name.c_str(), "SL", 2)) {
         setSliceFromString(name.c_str() + 2, value.c_str());
       } else if (!strcasecmp(name.c_str(), "sample")) {

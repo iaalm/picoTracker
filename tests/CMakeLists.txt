@@ -51,6 +51,8 @@ add_executable(picoTracker_persist
   ../sources/Application/Instruments/I_Instrument.cpp
   ../sources/Application/Instruments/InstrumentNameVariable.cpp
   ../sources/Application/Instruments/SampleInstrument.cpp
+  ../sources/Application/Instruments/SampleVariable.cpp
+  ../sources/Application/Instruments/SamplePool.cpp
   ../sources/Application/Instruments/SRPUpdaters.cpp
   ../sources/Application/Instruments/SynthInstrument.cpp
   ../sources/Application/Instruments/SynthVoice.cpp
@@ -66,6 +68,7 @@ add_executable(picoTracker_persist
   ../sources/Foundation/Observable.cpp
   ../sources/Foundation/Variables/VariableContainer.cpp
   ../sources/Foundation/Variables/Variable.cpp
+  ../sources/Foundation/Variables/WatchedVariable.cpp
   ../sources/System/Console/Trace.cpp
   ../sources/System/Console/n_assert.cpp
   ../sources/Externals/yxml/yxml.c

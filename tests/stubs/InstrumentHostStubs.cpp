@@ -1,19 +1,20 @@
 // Host-side stubs for the I_Instrument link-time dependencies the production
 // firmware pulls in via DSP / service / timing code (Opal OPL3 emulator,
-// cRSID SID emulator, Profiler, TableSaveState::Reset).
+// cRSID SID emulator, Profiler, TableSaveState::Reset, WavFile).
 //
-// We do NOT exercise any of these code paths in the persistence tests — the
-// tests only read the static NAMES / SPECS / FORMATS tables and call
-// GetParamName / GetParamCount / FindParamByName. The constructors and statics
-// from the instrument .cpp files nevertheless reference these symbols (e.g.
-// SIDInstrument's static cRSID members, OpalInstrument's Opal member,
-// MidiInstrument's MidiService lookup). These stubs satisfy the linker; they
-// are intentionally trivial because the real implementations are
-// RP2040/DSP-bound and have no host value.
+// We do NOT exercise any of these code paths in the persistence tests — they
+// read the static NAMES / SPECS / FORMATS tables and drive the parameter and
+// save/restore APIs, never the DSP or sample-data paths. The constructors and
+// statics from the instrument .cpp files nevertheless reference these symbols
+// (e.g. SIDInstrument's static cRSID members, OpalInstrument's Opal member,
+// MidiInstrument's MidiService lookup, SamplePool's WavFile array). These
+// stubs satisfy the linker; they are intentionally trivial because the real
+// implementations are RP2040/DSP-bound and have no host value.
 //
 // T_Factory<T>::GetInstance (MidiService / TimerService) is already provided
 // by Foundation/T_Factory.cpp — no stub needed there.
 
+#include "Application/Instruments/WavFile.h"
 #include "Application/Player/TablePlayback.h"
 #include "Application/Utils/fixed.h"
 #include "Externals/cRSID/SID.h"
@@ -25,6 +26,14 @@
 // ---- MidiService: abstract methods MidiInstrument.o references ----
 void MidiService::RegisterActiveChannel(uint8_t /*channel*/) {}
 void MidiService::QueueMessage(MidiMessage & /*msg*/) {}
+
+// ---- WavFile ----
+// SamplePool embeds `WavFile wav_[MAX_SAMPLES]`, so constructing a pool needs
+// these two symbols. The real WavFile.cpp pulls in the SRC resampler and the
+// filesystem layer; the persistence tests never read sample data, so stubs
+// are enough to let SampleInstrument be instantiated.
+WavFile::WavFile() {}
+void WavFile::Close() {}
 
 // ---- cRSID (SID emulator) ----
 cRSID::cRSID(unsigned short /*samplerate*/) {

@@ -64,10 +64,17 @@ void I_Instrument::SaveContent(tinyxml2::XMLPrinter *printer) {
   // the right serialisation strategy (legacy Variable::GetString while
   // Variables() is still live; GetParamFormat/GetParamValue once an
   // instrument migrates to packed storage).
+  //
+  // Start at idx 1: index 0 is the reserved name slot, already written above
+  // from name_. Including it here emitted a *second* PARAM NAME=
+  // "InstrumentName", formatted as "%d" over params_[0] — a slot no
+  // instrument ever writes, so always "0". RestoreContent walks PARAMs in
+  // document order, so that second entry overwrote the real name and every
+  // saved instrument reloaded as "0".
   char valueBuf[64];
   int count = GetParamCount();
   const etl::ivector<Variable *> *vars = Variables();
-  for (int idx = 0; idx < count; idx++) {
+  for (int idx = 1; idx < count; idx++) {
     printer->OpenElement("PARAM");
     printer->PushAttribute("NAME", GetParamName(idx));
     Variable *v = (vars && idx < (int)vars->size()) ? (*vars)[idx] : nullptr;
@@ -98,6 +105,7 @@ void I_Instrument::RestoreContent(PersistencyDocument *doc) {
   // PARAM element)
   bool subelem = doc->FirstChild();
   int paramCount = 0;
+  bool gotName = false;
 
   while (subelem) {
     // Process the PARAM element attributes
@@ -117,9 +125,15 @@ void I_Instrument::RestoreContent(PersistencyDocument *doc) {
     if (name[0] != '\0' && value[0] != '\0') {
       // Special handling for InstrumentName parameter
       if (!strcasecmp(name, "InstrumentName")) {
-        SetName(value);
-        Trace::Log("I_INSTRUMENT", "Set instrument name: %s", value);
-        paramCount++;
+        // Only the first one counts. Files written before the SaveContent
+        // fix carry a second, bogus InstrumentName="0" from the param loop;
+        // honouring it would clobber the real name on every such project.
+        if (!gotName) {
+          SetName(value);
+          gotName = true;
+          Trace::Log("I_INSTRUMENT", "Set instrument name: %s", value);
+          paramCount++;
+        }
       } else {
         int idx = FindParamByName(name);
         if (idx >= 0) {
