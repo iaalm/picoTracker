@@ -24,6 +24,11 @@
 // marks a section heading (drawn in the accent colour, not as a binding).
 #define HEAD "\x01"
 
+// One binding per line, all the way down: each entry is one rendered row, so
+// the source layout mirrors the screen and a wrong-width string is visible at
+// a glance. clang-format would pack the shorter blocks two-per-line and lose
+// that, so the whole run of tables is fenced off.
+// clang-format off
 static const char *const commonLines[] = {
     HEAD "ANY SCREEN",
     "ENTER      insert value",
@@ -37,16 +42,12 @@ static const char *const commonLines[] = {
 // separate handler (e.g. SongView::processSelectionButtonMask), where bare
 // EDIT copies instead of doing nothing. Listing them beside the normal
 // bindings read as if they were always live.
-// One binding per line, as in the blocks above; clang-format would otherwise
-// pack this one two-per-line because the strings are shorter.
-// clang-format off
 static const char *const selectionLines[] = {
     HEAD "WHILE SELECTING",
     "ALT+EDIT   grow row/screen",
     "EDIT       copy selection",
     "ALT+ENTER  cut selection",
 };
-// clang-format on
 
 // The song screen is two screens wearing one coat: EDIT+L/R flips the
 // sequencer between song and live mode, and PLAY, EDIT+PLAY and NAV+PLAY
@@ -112,6 +113,7 @@ static const char *const tableLines[] = {
     "EDIT+L/R   table -/+ 1",
     "EDIT+U/D   table -/+ 16",
 };
+// clang-format on
 
 #define COUNT_OF(a) ((int)(sizeof(a) / sizeof((a)[0])))
 
