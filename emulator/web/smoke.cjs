@@ -1,11 +1,18 @@
 // Headless smoke test for the WebAssembly emulator build.
 // Loads the page, waits for the canvas to show non-black pixels, sends a few
 // keys, and writes screenshots. Exits non-zero if the UI never renders.
+const path = require("path");
 const puppeteer = require("puppeteer-core");
 
-const URL = "http://127.0.0.1:8731/";
+const URL = process.env.PT_URL || "http://127.0.0.1:8731/";
+// Resolved from this file rather than hardcoded, so the release workflow can
+// run it after installing the browser into .browser/ at the repo root.
 const EXE =
-  "/home/simon/Projects/picoTracker/.browser/chrome-headless-shell-linux64/chrome-headless-shell";
+  process.env.PT_CHROME ||
+  path.resolve(
+    __dirname,
+    "../../.browser/chrome-headless-shell-linux64/chrome-headless-shell",
+  );
 
 (async () => {
   const browser = await puppeteer.launch({

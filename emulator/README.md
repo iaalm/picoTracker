@@ -108,6 +108,22 @@ Two consequences worth knowing:
 Which project opens is decided by the `.current` file in that directory, as
 on the device.
 
+The default `test_root/` is gitignored and 27 MB, so CI can't use it. The
+committed `emulator/web/sdroot/` is the minimum that boots — one 15-byte
+project file, giving a 1.7 MB `index.data` instead of 27 MB. See
+`emulator/web/sdroot-README.md` for why it can't just be an empty directory.
+
+### Publishing
+
+`.github/workflows/release.yml` builds this on every `v*` tag, attaches a zip
+of `dist/` to the GitHub release, and deploys the same files to GitHub Pages,
+so the tagged version is playable at the project's Pages URL. It builds
+against `emulator/web/sdroot/` and gates the deploy on `smoke.cjs` passing.
+
+Running it needs Pages set to "GitHub Actions" as its source in the
+repository's Settings → Pages — that's a one-time manual step the workflow
+can't do for itself.
+
 ### Browser specifics
 
 * A click is required before audio starts; the shell page shows a
@@ -166,6 +182,11 @@ node emulator/web/combocheck.cjs # does NAV+UP switch screens?
 node emulator/web/entercheck.cjs # ENTER+UP on a field owning no Variable
 node emulator/web/settingscheck.cjs # walk every settings screen and field
 ```
+
+The scripts hardcode the path to the browser binary. `smoke.cjs` — the one CI
+runs — takes `PT_CHROME` and `PT_URL` overrides instead, because the
+`@puppeteer/browsers` install nests the binary under a version directory that
+changes with every Chrome release.
 
 `entercheck.cjs` and `settingscheck.cjs` need a bundled project that has
 instruments; against the default empty one they stop at the instrument

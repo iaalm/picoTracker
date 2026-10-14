@@ -1,0 +1,223 @@
+name: Release
+
+# Cuts a release from a version tag: firmware .uf2 for both display variants,
+# plus the WebAssembly build, which is also published to GitHub Pages so the
+# tagged version is playable in a browser without downloading anything.
+#
+#   git tag v2.4 && git push origin v2.4
+#
+# workflow_dispatch builds and deploys Pages without creating a release, which
+# is the way to test a change to this file.
+#
+# Note: ghpages-hosting-merge.yml also publishes to Pages (the user manual, at
+# the same site root), so whichever ran last wins. In this fork that one is
+# effectively dormant -- it triggers on the 2.3-release branch, which does not
+# exist here -- but if the manual is ever wanted alongside this, one of the two
+# needs to move into a subdirectory.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# A second tag pushed while this is running would race the first to Pages.
+# Don't cancel in progress: a half-deployed site is worse than a queued one.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  firmware:
+    name: Firmware (${{ matrix.lcd }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lcd: LCD_ILI9341
+            suffix: ili9341
+          - lcd: LCD_ST7789
+            suffix: st7789
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Arm GNU Toolchain (arm-none-eabi-gcc)
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+        id: arm-none-eabi-gcc-action
+        with:
+          release: 13.2.Rel1
+
+      - name: Set build number
+        run: |
+          cat > sources/Application/Model/BuildNumber.h <<EOF
+          /*
+           * SPDX-License-Identifier: BSD-3-Clause
+           *
+           * Copyright (c) 2018 Discodirt
+           * Copyright (c) 2024 xiphonics, inc.
+           *
+           * This file is part of the picoTracker firmware
+           */
+
+          #define BUILD_COUNT "${{ github.run_number }}"
+          EOF
+
+      - name: Old Cmake in Mbedtls workaround
+        run: rm -rf sources/Externals/pico-sdk/lib/mbedtls
+
+      - name: Configure
+        run: |
+          PICO_SDK_PATH=$GITHUB_WORKSPACE/sources/Externals/pico-sdk \
+          PICO_TOOLCHAIN_PATH=${{ steps.arm-none-eabi-gcc-action.outputs.path }} \
+          cmake -S sources -B build-${{ matrix.suffix }} \
+                -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DUSE_LCD=${{ matrix.lcd }}
+
+      - name: Build
+        run: cmake --build build-${{ matrix.suffix }} --config $BUILD_TYPE --parallel $(nproc)
+
+      - name: Name the artifact after the tag
+        run: |
+          mkdir -p out
+          cp build-${{ matrix.suffix }}/Adapters/picoTracker/main/picoTracker.uf2 \
+             "out/picoTracker-${{ github.ref_name }}-${{ matrix.suffix }}.uf2"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.suffix }}
+          path: out/*.uf2
+
+  web:
+    name: WebAssembly
+    runs-on: ubuntu-latest
+    steps:
+      # The emulator links against etl, TinyXML2, yxml, cRSID, opal and SRC.
+      # Only etl is a submodule, and pico-sdk (the expensive one) is not in
+      # that list at all -- the SDL/web adapter replaces it.
+      - uses: actions/checkout@v4
+      - run: git submodule update --init sources/Externals/etl
+
+      # Pinned, not 'latest': an emsdk bump changes the generated JS and the
+      # SDL3 port under it, and that should break a deliberate commit here
+      # rather than a release that happened to be cut on the wrong day.
+      - uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: 6.0.11
+          actions-cache-folder: emsdk-cache
+
+      - name: Set build number
+        run: |
+          cat > sources/Application/Model/BuildNumber.h <<EOF
+          /*
+           * SPDX-License-Identifier: BSD-3-Clause
+           *
+           * Copyright (c) 2018 Discodirt
+           * Copyright (c) 2024 xiphonics, inc.
+           *
+           * This file is part of the picoTracker firmware
+           */
+
+          #define BUILD_COUNT "${{ github.run_number }}"
+          EOF
+
+      - name: Configure
+        # PT_WEB_SDROOT defaults to test_root/, which is gitignored and absent
+        # here. emulator/web/sdroot is the committed 15-byte stand-in; see
+        # emulator/web/sdroot-README.md for why it can't be an empty directory.
+        run: |
+          emcmake cmake -S emulator -B build-web \
+                  -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+                  -DPT_WEB_SDROOT=$GITHUB_WORKSPACE/emulator/web/sdroot
+
+      - name: Build
+        run: cmake --build build-web --parallel $(nproc)
+
+      - name: Check it actually boots
+        # A wasm build that links cleanly can still trap on the first frame,
+        # and the page would then be a black canvas with no error. smoke.cjs
+        # asserts the canvas has lit pixels and that they change on input.
+        run: |
+          npx --yes @puppeteer/browsers install chrome-headless-shell@stable --path "$GITHUB_WORKSPACE/.browser"
+          npm install --no-save puppeteer-core
+          # The install nests the binary under a version directory, so locate
+          # it rather than hardcoding a path that changes with every release.
+          PT_CHROME=$(find "$GITHUB_WORKSPACE/.browser" -type f -name chrome-headless-shell | head -1)
+          test -x "$PT_CHROME" || { echo "chrome-headless-shell not found"; exit 1; }
+          (cd build-web/dist && python3 -m http.server 8731 &)
+          timeout 60 bash -c 'until curl -sf http://127.0.0.1:8731/index.html >/dev/null; do sleep 1; done'
+          PT_CHROME="$PT_CHROME" node emulator/web/smoke.cjs
+
+      - name: Package for the release
+        run: |
+          mkdir -p out
+          (cd build-web/dist && zip -r "$GITHUB_WORKSPACE/out/picoTracker-${{ github.ref_name }}-web.zip" .)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-zip
+          path: out/*.zip
+
+      # Separate artifact in the layout Pages wants: the site is the contents
+      # of dist/, not a zip of it.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build-web/dist
+
+  release:
+    name: Create release
+    needs: [firmware, web]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          pattern: '{firmware-*,web-zip}'
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cat > notes.md <<EOF
+          ## Try it in a browser
+
+          <https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/>
+
+          That page runs this tag's build. It is the emulator, not the
+          firmware: sequencing and the synth engines are faithful, but the
+          device's RAM budget and timing are not. Projects you make there live
+          in the tab and are gone on reload.
+
+          ## Firmware
+
+          Pick the \`.uf2\` matching your display. Hold BOOTSEL while plugging
+          the device in, then copy the file to the drive that appears.
+          EOF
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file notes.md \
+            assets/*
+
+  pages:
+    name: Deploy to Pages
+    needs: web
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/configure-pages@v4
+      - id: deployment
+        uses: actions/deploy-pages@v4
