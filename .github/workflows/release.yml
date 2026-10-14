@@ -174,7 +174,10 @@ jobs:
 
   release:
     name: Create release
-    needs: [firmware, web]
+    # Also needs pages, to put the real deployed URL in the notes rather than
+    # a guessed one: this repo's Pages site is on a custom domain, so the
+    # owner.github.io/repo form is a redirect, not the address.
+    needs: [firmware, web, pages]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
@@ -189,11 +192,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+          PAGE_URL: ${{ needs.pages.outputs.page_url }}
         run: |
           cat > notes.md <<EOF
           ## Try it in a browser
 
-          <https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/>
+          <${PAGE_URL}>
 
           That page runs this tag's build. It is the emulator, not the
           firmware: sequencing and the synth engines are faithful, but the
@@ -216,6 +220,8 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/configure-pages@v4
