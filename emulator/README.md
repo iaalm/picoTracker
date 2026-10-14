@@ -115,14 +115,19 @@ project file, giving a 1.7 MB `index.data` instead of 27 MB. See
 
 ### Publishing
 
-`.github/workflows/release.yml` builds this on every `v*` tag, attaches a zip
-of `dist/` to the GitHub release, and deploys the same files to GitHub Pages,
-so the tagged version is playable at the project's Pages URL. It builds
-against `emulator/web/sdroot/` and gates the deploy on `smoke.cjs` passing.
+`.github/workflows/release.yml` builds this and deploys it to GitHub Pages on
+every push to `master` that touches `sources/` or `emulator/`, so the playable
+site at <https://www.iaalm.net/picoTracker/> always matches master. It builds
+against `emulator/web/sdroot/` and gates the deploy on `smoke.cjs` passing — a
+wasm build that links fine can still trap on the first frame and leave nothing
+but a black canvas.
 
-Running it needs Pages set to "GitHub Actions" as its source in the
-repository's Settings → Pages — that's a one-time manual step the workflow
-can't do for itself.
+Pushing a `v*` tag does that too, and additionally builds both firmware `.uf2`
+variants and cuts a GitHub release with them and a zip of the web build
+attached.
+
+Pages must be set to "GitHub Actions" as its source under Settings → Pages;
+that's a one-time manual step the workflow can't do for itself.
 
 ### Browser specifics
 

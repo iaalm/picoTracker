@@ -1,13 +1,18 @@
 name: Release
 
-# Cuts a release from a version tag: firmware .uf2 for both display variants,
-# plus the WebAssembly build, which is also published to GitHub Pages so the
-# tagged version is playable in a browser without downloading anything.
+# Two things, on two triggers:
 #
-#   git tag v2.4 && git push origin v2.4
+#   push to master  -> build the web version and deploy it to Pages, so the
+#                      playable site always matches master.
+#   push a v* tag   -> additionally build both firmware .uf2 variants and cut
+#                      a GitHub release with them and the web build attached.
 #
-# workflow_dispatch builds and deploys Pages without creating a release, which
-# is the way to test a change to this file.
+# The firmware is deliberately not built on master pushes: build.yml already
+# compiles both variants on every push to sources/**, and doing it here too
+# would just burn eight minutes of runner time for the same artifacts.
+#
+# workflow_dispatch does the master-push half without releasing, which is the
+# way to test a change to this file.
 #
 # Note: ghpages-hosting-merge.yml also publishes to Pages (the user manual, at
 # the same site root), so whichever ran last wins. In this fork that one is
@@ -17,16 +22,29 @@ name: Release
 on:
   workflow_dispatch:
   push:
+    branches:
+      - master
     tags:
       - 'v[0-9]*'
+    # Applies to the branch push only. Whether GitHub also applies a paths
+    # filter to tag pushes is undocumented, so the firmware and release jobs
+    # below gate on refs/tags/ explicitly rather than relying on it: a tag
+    # that got filtered out here would silently skip the release.
+    paths:
+      - sources/**
+      - emulator/**
+      - .github/workflows/release.yml
 
 permissions:
   contents: write
   pages: write
   id-token: write
 
-# A second tag pushed while this is running would race the first to Pages.
-# Don't cancel in progress: a half-deployed site is worse than a queued one.
+# Serialise deploys: two runs racing would leave whichever finished last on
+# the site, not whichever was newer. GitHub keeps only the newest *pending*
+# run per group, so a burst of master pushes converges on the latest commit.
+# In-progress runs are not cancelled when tagging, since a half-created
+# release is worse than a slow one.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -37,6 +55,9 @@ env:
 jobs:
   firmware:
     name: Firmware (${{ matrix.lcd }})
+    # Only for releases. On a master push build.yml already builds both
+    # variants, and nothing here publishes them anywhere.
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -199,10 +220,15 @@ jobs:
 
           <${PAGE_URL}>
 
-          That page runs this tag's build. It is the emulator, not the
-          firmware: sequencing and the synth engines are faithful, but the
-          device's RAM budget and timing are not. Projects you make there live
-          in the tab and are gone on reload.
+          That page tracks master, so it matches this release on the day it
+          was cut and moves on afterwards. For this exact version, the
+          \`-web.zip\` below is the same build -- unzip and serve it over HTTP
+          (opening the .html from file:// fails the .data fetch).
+
+          Either way it's the emulator, not the firmware: sequencing and the
+          synth engines are faithful, but the device's RAM budget and timing
+          are not. Projects you make there live in the tab and are gone on
+          reload.
 
           ## Firmware
 
